@@ -1,0 +1,15 @@
+name = "counter-test"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+[[durable_objects.bindings]]
+name = "COUNTER_ROOM"
+class_name = "CounterRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["CounterRoom"]
+
+[[rules]]
+type = "Text"
+globs = ["**/*.html"]

@@ -1,71 +1,9 @@
 import { DurableObject } from "cloudflare:workers";
-
-type Config = {}
-
-class GameState<State>
-{
-    private values: FullState<State>
-    constructor(existingState: FullState<State> | undefined = undefined )
-    {
-        if(existingState)
-        {
-            this.values = existingState
-        }else
-        {
-            this.values = {
-                numPlayers: 0,
-                idCounter: 0
-            } as FullState<State>
-        }
-    }
-
-    public UpdateState(newState : Partial<FullState<State>>)
-    {
-        Object.assign(this.values, newState)
-    }
-
-    public incrementField(key: keyof FullState<State>, by: number = 1) {
-        this.UpdateState({ [key]: (this.values[key] as number) + by } as Partial<FullState<State>>)
-    }
-
-    public decrementField(key: keyof FullState<State>, by: number = 1) {
-        this.incrementField(key, -by)
-    }
-
-    public getField<K extends keyof FullState<State>>(key: K): FullState<State>[K] {
-        return this.values[key] as FullState<State>[K]
-    }
-
-}
-
-type FullState<State> = State & BaseState
-
-type Action<State> = {
-    type: string,
-    payload: Partial<FullState<State>>
-}
-
-type ActionResult = 
-{
-    valid: true
-} | 
-{
-    valid: false,
-    reason: string
-}
-
-type Player = {
-    name: string,
-    id: number,
-}
-
-type BaseState = {
-    numPlayers: number, 
-    idCounter: number
-}
+import { GameState, FullState, Action, Player, Config, Result } from "./types"
 
 export abstract class GameRoom<Config, State, Env = unknown> extends DurableObject<Env> {
-    currentGameState : GameState<FullState<State>>
+    protected currentGameState : GameState<FullState<State>>
+    protected config : Config
 
     constructor(ctx: DurableObjectState, env: Env) {
         super(ctx, env);
@@ -75,26 +13,45 @@ export abstract class GameRoom<Config, State, Env = unknown> extends DurableObje
         //if there is existing state and one or more existing websocket connections
         if(oldState && this.ctx.getWebSockets().length > 0)
         {
-            this.currentGameState = new GameState<FullState<State>>(oldState)
+            this.currentGameState = new GameState<FullState<State>>(this._OnStateUpdate, oldState)
         }else 
         {
-            this.currentGameState = new GameState<FullState<State>>(this.getInitialState())
+            this.currentGameState = new GameState<FullState<State>>(this._OnStateUpdate, this.getInitialState())
+            this.onRoomStart()
         }
+
+        this.config = this.getConfig()
         
     }
 
-    //User defines their state defaults in their child class
+    //User defines their state and config defaults in their child class
     abstract getInitialState(): FullState<State>
-
-    async getPlayers() : Promise<number>
-    {
-        return this.currentGameState.getField("numPlayers")
-    }
+    abstract getConfig() : Config
 
     //----- DURABLE OBJECT LIFECYCLE -----
 
     async fetch(request: Request): Promise<Response> {
         const url = new URL(request.url)
+
+        switch (url.pathname) {
+        case "/websocket":
+            if (request.headers.get("Upgrade") != "websocket") {
+                return new Response("Expected websocket", { status: 406 })
+            }
+
+            const attempt = this.validatePlayerTryJoin()
+
+            if(!attempt.success)
+            {
+                return new Response(attempt.reason, { status: 406 })
+            }
+
+            break;
+        case "/":
+            break;
+        default:
+            return new Response("Not found", { status: 404 });
+        }
 
         // Creates two ends of a WebSocket connection.
         const webSocketPair = new WebSocketPair();
@@ -121,15 +78,22 @@ export abstract class GameRoom<Config, State, Env = unknown> extends DurableObje
         });
     }
 
+    /**
+     * Begins the validation pipeline when a message is recieved. 
+     * Sends back an error if message is malformed or deemed invalid by server.
+     * 
+     * @param ws - WebSocket that message was sent on.
+     * @param message - Message that was sent.
+     */
     async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string) {
         try {
             const action = JSON.parse(message as string) as Action<FullState<State>>
             const player : Player = ws.deserializeAttachment()
-            const result : ActionResult = this.validatePlayerAction(player, action)
+            const result : Result = this.validatePlayerAction(player, action)
 
-            if(result.valid)
+            if(result.success)
             {
-                this._OnValidPlayerAction(player, action)
+                this.onValidPlayerAction(player, action)
             }else
             {
                 ws.send(JSON.stringify({ error: result.reason }))
@@ -140,6 +104,15 @@ export abstract class GameRoom<Config, State, Env = unknown> extends DurableObje
         
     }
 
+
+    /**
+     * Closes a websocket.
+     * 
+     * @param ws - WebSocket to close.
+     * @param code - Four-digit integer used to indicate why the connection was terminated.
+     * @param reason - Why the connection was terminated.
+     * @param wasClean - Indicates if the termination occured after a proper handshake.
+     */
     async webSocketClose(
     ws: WebSocket,
     code: number,
@@ -151,9 +124,12 @@ export abstract class GameRoom<Config, State, Env = unknown> extends DurableObje
     }
 
     // ----- PRIVATE ------
+    // These are run before the hooks are invoked so that certain functionality is always run
 
     private _OnPlayerJoin(player : Player)
     {
+        this.currentGameState.incrementField("numPlayers", 1)
+        this._OnStateUpdate()
         this.onPlayerJoin(player)
     }
 
@@ -163,30 +139,114 @@ export abstract class GameRoom<Config, State, Env = unknown> extends DurableObje
 
         if(this.currentGameState.getField("numPlayers") == 0)
         {
+            //lobbies need not remember previous game states
+            this.ctx.storage.deleteAll()
             this.ctx.abort()
             return
         }
 
+        this._OnStateUpdate()
         this.onPlayerLeave(player)
     }
 
-    private _OnValidPlayerAction(player : Player, action : Action<FullState<State>>) : void 
+    private _OnStateUpdate() : void
     {
-        this.currentGameState.UpdateState(action.payload)
-        this.onStateUpdate(this.currentGameState)
+        for(const ws of this.ctx.getWebSockets())
+        {
+            ws.send(JSON.stringify(this.currentGameState.getStateValues()))
+        }
+
+        this.onStateUpdate()
     }
 
     // ----- PUBLIC HOOKS -----
 
+    /**
+     * Called when a player joins the room.
+     * 
+     * @param player - The player that joined.
+     */
     public onPlayerJoin(player : Player) : void {}
+
+    /**
+     * Called when a player leaves the room.
+     * 
+     * @param player - The player that left.
+     */
     public onPlayerLeave(player : Player) : void {}
 
-    public abstract validatePlayerAction(player : Player, action : Action<FullState<State>>) : ActionResult
+    /**
+     * Validates a player attempt to join the room.
+     * 
+     * @returns an error Result if the player can't join, and a success result otherwise
+     */
+    public abstract validatePlayerTryJoin() : Result
+
+    /**
+     * Validates a player's action before it is applied to state
+     * 
+     * @param player - The attempting player.
+     * @param action - The state change that the player is attempting.
+     * @returns an error Result if the Action is invalid, and a success result otherwise
+     */
+    public abstract validatePlayerAction(player : Player, action : Action<FullState<State>>) : Result
+   
+    /**
+     * Called when a valid player action is processed.
+     * 
+     * @param player - The player who did the action.
+     * @param action - The state change that the player requested.
+     */
     public abstract onValidPlayerAction(player : Player, action : Action<FullState<State>>) : void 
 
-    public onGameTick() : void {}
-    public onStateUpdate(state : GameState<FullState<State>>) : void {}
+    /**
+     * Called when the room's state updates.
+     * 
+     * @param state - The state after update
+     */
+    public onStateUpdate() : void {}
+
+    /**
+     * Called when the room starts.
+     */
+    public onRoomStart() : void {}
+
+    /**
+     * Called when the game starts.
+     */
     public onGameStart() : void {}
+
+    /**
+     * Called when the game ends.
+     */
     public onGameEnd() : void {}
+
+    /**
+     * Called when a player reconnects.
+     * 
+     * @param player - The player that is reconnecting.
+     */
     public onPlayerReconnect(player : Player) : void {}
+
+
+    /**
+     * Sends a message to a specific player.
+     * 
+     * @param player - The player to send the message to.
+     * @param message - The message to send.
+     * @returns An error result if the player can't be found, a success result otherwise
+     */
+    public sendMessageToPlayer(player : Player, message : string) : Result 
+    {
+        for(const ws of this.ctx.getWebSockets())
+        {
+            if(ws.deserializeAttachment().id === player.id)
+            {
+                ws.send(message)
+                return {success: true} as Result
+            }
+        }
+
+        return {success: false, reason: "Player not found."} as Result
+    }
 }

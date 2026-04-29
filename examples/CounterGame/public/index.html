@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <button onclick="sendAction()">Increment</button>
+    <p id="count">0</p>
+
+    <script>
+        const ws = new WebSocket("ws://localhost:8787/websocket")
+
+        ws.onmessage = (event) => {
+            const state = JSON.parse(event.data)
+            document.getElementById("count").innerText = state.count
+        }
+
+        function sendAction() {
+            ws.send(JSON.stringify({ type: "INCREMENT", payload: {} }))
+        }
+    </script>
+</body>
+</html>
