@@ -1,0 +1,15 @@
+{
+  "name": "gameroom",
+  "version": "1.0.0",
+  "description": "Gameroom helps you build games with Durable Objects",
+  "main": "index.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Logan Williams",
+  "license": "ISC",
+  "dependencies": {
+    "@cloudflare/workers-types": "^4.20260426.1",
+    "typescript": "^6.0.3"
+  }
+}
