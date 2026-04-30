@@ -1,8 +1,10 @@
 {
-  "name": "gameroom",
+  "name": "@loganlee23/gameroom",
   "version": "1.0.0",
   "description": "Gameroom helps you build games with Durable Objects",
-  "main": "index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
