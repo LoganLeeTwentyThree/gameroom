@@ -1,9 +1,7 @@
 {
     "name": "CounterGame",
-    "dependencies": {
-        "gameroom": "../../"
-    },
     "devDependencies": {
+        "@loganlee23/gameroom": "../../",
         "wrangler": "^4.86.0"
     },
     "type": "module"

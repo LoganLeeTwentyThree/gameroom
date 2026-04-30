@@ -63,6 +63,12 @@ export class Matchmaker<Env = unknown> extends DurableObject<Env>
     wasClean: boolean,
     ) 
     {
-        ws.close(code, "Durable Object is closing WebSocket: " + reason); 
+        try{
+            ws.close(code, "Durable Object is closing WebSocket: " + reason); 
+        }catch (e)
+        {
+            console.log(e)
+        }
+        
     }
 }

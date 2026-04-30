@@ -3,6 +3,8 @@ import { DurableObject } from "cloudflare:workers";
 
 export class RateLimiter<Env = unknown> extends DurableObject<Env>
 {
+    //in-memory state doesn't need to be saved between hibernations
+    //if a rate-limiter hibernates, its not receiving any requests!
     bucket : number = 250
     lastRequest : number = Date.now()
     constructor(ctx: DurableObjectState, env: Env) {
@@ -33,7 +35,7 @@ export class RateLimiter<Env = unknown> extends DurableObject<Env>
 }
 
 // RateLimiterClient implements rate limiting logic on the caller's side.
-class RateLimiterClient {
+export class RateLimiterClient {
     inCooldown : boolean = false
     limiter: DurableObjectStub<RateLimiter>
     getLimiterStub: () => DurableObjectStub<RateLimiter>
@@ -47,12 +49,16 @@ class RateLimiterClient {
     // Call checkLimit() when a message is received to decide if it should be blocked due to the
     // rate limit. Returns `true` if the message should be accepted, `false` to reject.
     checkLimit() {
+        this.callLimiter();
         if (this.inCooldown) {
             return false;
         }
-        this.inCooldown = true;
-        this.callLimiter();
         return true;
+    }
+
+    deduct()
+    {
+        this.limiter.countRequest()
     }
 
     // callLimiter() is an internal method which talks to the rate limiter.
@@ -62,7 +68,9 @@ class RateLimiterClient {
         //if you run out of tokens, wait until the bucket is full again
         if(remaining <= 0)
         {
+            this.inCooldown = true
             await new Promise(resolve => setTimeout(resolve, 1000));
+            this.inCooldown = false
         }
     }
 }

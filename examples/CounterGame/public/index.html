@@ -10,11 +10,15 @@
         <h2>Counter Game</h2>
         <p>Count: <span id="count">0</span></p>
         <button onclick="increment()">Increment</button>
+        <button onclick="reconnect()">Simulate Reconnect</button>
         <p id="game-status"></p>
     </div>
 
     <script>
         let gameWs = null
+        let playerId = localStorage.getItem("playerId")
+        let playerName = "Player" + Math.floor(Math.random() * 1000)
+        let currentLobby = localStorage.getItem("lobbyId")
 
         function joinQueue() {
             document.getElementById("status").innerText = "Searching for players..."
@@ -26,9 +30,10 @@
                 const message = JSON.parse(event.data)
 
                 if(message.command === "Match") {
-                    document.getElementById("status").innerText = "Match found!"
-                    matchWs.close()
-                    joinLobby(message.lobby)
+                    currentLobby = message.lobby
+                    localStorage.setItem("lobbyId", currentLobby)
+                    joinLobby(currentLobby)  // join first
+                    matchWs.close()          // then close
                 }
             }
 
@@ -39,19 +44,36 @@
         }
 
         function joinLobby(lobbyId) {
-            gameWs = new WebSocket("ws://localhost:8787/websocket?lobby=" + lobbyId)
+            let url = `ws://localhost:8787/websocket?lobby=${lobbyId}&playerName=${playerName}`
+
+            if(playerId) {
+                url += `&playerId=${playerId}`
+            }
+
+            gameWs = new WebSocket(url)
 
             gameWs.onopen = () => {
                 document.getElementById("queue-screen").style.display = "none"
                 document.getElementById("game-screen").style.display = "block"
-                document.getElementById("game-status").innerText = "Connected to lobby: " + lobbyId
+                document.getElementById("game-status").innerText = "Connected - ID: " + (playerId ?? "new player")
             }
 
             gameWs.onmessage = (event) => {
-                const data = JSON.parse(event.data)
-                console.log(data)
-                if(data.state && data.state.count !== undefined) {
-                    document.getElementById("count").innerText = data.state.count
+                const message = JSON.parse(event.data)
+
+                if(message.playerId) {
+                    playerId = message.playerId
+                    localStorage.setItem("playerId", playerId)
+                    document.getElementById("game-status").innerText = "Connected - ID: " + playerId
+                }
+
+                if(message.state)
+                {
+                    document.getElementById("count").innerText = message.state.count
+                }
+
+                if(message.count !== undefined) {
+                    document.getElementById("count").innerText = message.count
                 }
             }
 
@@ -64,6 +86,17 @@
             if(gameWs && gameWs.readyState === WebSocket.OPEN) {
                 gameWs.send(JSON.stringify({ type: "INCREMENT", payload: {} }))
             }
+        }
+
+        function reconnect() {
+            if(gameWs) gameWs.close()
+            if(currentLobby) joinLobby(currentLobby)
+        }
+
+        // auto reconnect if we have a stored lobby and player id
+        if(currentLobby && playerId) {
+            document.getElementById("status").innerText = "Reconnecting to previous game..."
+            joinLobby(currentLobby)
         }
     </script>
 </body>

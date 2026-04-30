@@ -1,7 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
-import { GameState, FullState, Action, Player, Config, Result } from "./types"
+import { GameState, FullState, Action, Player, Config, Result, JSONValue } from "./types"
 
-export abstract class GameRoom<Config, State, Env = unknown> extends DurableObject<Env> {
+export abstract class GameRoom<Config, State extends Record<string, JSONValue>, Env = unknown> extends DurableObject<Env> {
     protected currentGameState : GameState<FullState<State>>
     protected config : Config
 
@@ -9,6 +9,7 @@ export abstract class GameRoom<Config, State, Env = unknown> extends DurableObje
 
     constructor(ctx: DurableObjectState, env: Env) {
         super(ctx, env);
+        this.env = env;
 
         const oldState : FullState<State> | null | undefined = this.ctx.storage.kv.get("gamestate")
 
@@ -57,20 +58,26 @@ export abstract class GameRoom<Config, State, Env = unknown> extends DurableObje
         const webSocketPair = new WebSocketPair();
         const [client, server] = Object.values(webSocketPair) as [WebSocket, WebSocket]
 
-        // save id for persistence between hibernations
-        const id : number = this.currentGameState.getField("idCounter")
-        this.currentGameState.incrementField("idCounter", 1)
-        
-        const player : Player = {
-            name: "Test", //will be from URL params later
-            id: id
+        const existingId = url.searchParams.get("playerId")
+        const existingPlayer = existingId 
+            ? this.currentGameState.getField("playerMap")[existingId]
+            : undefined
+
+        const player: Player = existingPlayer ?? {
+            name: url.searchParams.get("playerName") ?? "Player",
+            id: crypto.randomUUID(),
+            ip: request.headers.get("CF-Connecting-IP") ?? "0.0.0.0"
         }
 
         server.serializeAttachment(player)
 
         this.ctx.acceptWebSocket(server);
 
-        this._OnPlayerJoin(player)
+        if(existingPlayer) {
+            this.onPlayerReconnect(player)
+        } else {
+            this._OnPlayerJoin(player)
+        }
 
         return new Response(null, {
             status: 101,
@@ -135,16 +142,24 @@ export abstract class GameRoom<Config, State, Env = unknown> extends DurableObje
 
     private _OnPlayerJoin(player : Player)
     {
-        this.currentGameState.incrementField("numPlayers", 1)
+        this.currentGameState.incrementField("activePlayerCount", 1)
+
+        this.currentGameState.UpdateState({
+            playerMap: {
+                ...this.currentGameState.getStateValues().playerMap,
+                [player.id]: player
+            }
+        } as Partial<FullState<State>>)
+
         this._OnStateUpdate()
         this.onPlayerJoin(player)
     }
 
     private _OnPlayerLeave(player : Player)
     {
-        this.currentGameState.decrementField("numPlayers", 1)
+        this.currentGameState.decrementField("activePlayerCount", 1)
 
-        if(this.currentGameState.getField("numPlayers") == 0)
+        if(this.currentGameState.getField("activePlayerCount") == 0)
         {
             //lobbies need not remember previous game states
             this.ctx.storage.deleteAll()
@@ -160,10 +175,16 @@ export abstract class GameRoom<Config, State, Env = unknown> extends DurableObje
     {
         for(const ws of this.ctx.getWebSockets())
         {
-            if(ws.OPEN)
+            try{
+                if(ws.OPEN)
+                {
+                    ws.send(JSON.stringify({ state: this.currentGameState.getStateValues() } ))
+                }
+            }catch
             {
-                ws.send(JSON.stringify({ state: this.currentGameState.getStateValues() } ))
+                //do.. something?
             }
+            
         }
 
         this.onStateUpdate()
@@ -220,16 +241,6 @@ export abstract class GameRoom<Config, State, Env = unknown> extends DurableObje
      * Called when the room starts.
      */
     public onRoomStart() : void {}
-
-    /**
-     * Called when the game starts.
-     */
-    public onGameStart() : void {}
-
-    /**
-     * Called when the game ends.
-     */
-    public onGameEnd() : void {}
 
     /**
      * Called when a player reconnects.

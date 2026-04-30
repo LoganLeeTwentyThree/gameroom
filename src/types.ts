@@ -1,19 +1,29 @@
 export type Config = {}
 
-export class GameState<State>
+type JSONPrimitive = string | number | boolean | null;
+
+export type JSONValue = 
+  | JSONPrimitive 
+  | JSONValue[] 
+  | { [key: string]: JSONValue };
+
+export type FullState<State extends Record<string, JSONValue>> = State & BaseState
+
+export class GameState<State extends Record<string, JSONValue>>
 {
     private values: FullState<State>
     private onStateChanged: () => void
     constructor(onStateChanged: () => void, existingState: FullState<State> | undefined = undefined )
     {
+
         if(existingState)
         {
             this.values = existingState
         }else
         {
             this.values = {
-                numPlayers: 0,
-                idCounter: 0
+                activePlayerCount: 0,
+                playerMap: {}
             } as FullState<State>
         }
 
@@ -29,13 +39,11 @@ export class GameState<State>
     public incrementField(key: keyof FullState<State>, by: number = 1) : void
     {
         this.UpdateState({ [key]: (this.values[key] as number) + by } as Partial<FullState<State>>)
-        this.onStateChanged()
     }
 
     public decrementField(key: keyof FullState<State>, by: number = 1) : void
     {
         this.incrementField(key, -by)
-        this.onStateChanged()
     }
 
     public getField<K extends keyof FullState<State>>(key: K): FullState<State>[K]
@@ -50,9 +58,7 @@ export class GameState<State>
 
 }
 
-export type FullState<State> = State & BaseState
-
-export type Action<State> = {
+export type Action<State extends Record<string, JSONValue>> = {
     type: string,
     payload: Partial<FullState<State>>
 }
@@ -68,10 +74,11 @@ export type Result =
 
 export type Player = {
     name: string,
-    id: number,
+    id: string,
+    ip: string,
 }
 
 export type BaseState = {
-    numPlayers: number, 
-    idCounter: number
+    activePlayerCount: number,
+    playerMap: Record<string, Player> 
 }

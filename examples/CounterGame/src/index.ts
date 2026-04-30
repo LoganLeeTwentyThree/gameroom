@@ -37,6 +37,10 @@ export class CounterRoom extends GameRoom<CounterRoomConfig, CounterRoomState, E
         this.currentGameState.incrementField("count")
     }
 
+    public onPlayerReconnect(player: Player): void {
+        console.log(player.id + " just reconnected");
+    }
+
     getInitialState(): FullState<CounterRoomState> {
         return {
             count: 0

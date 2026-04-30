@@ -7,7 +7,7 @@ TODO :)
 
 ## Features
 ### Gameroom
-A `GameRoom` is a durable object class that handles the back end logic of your game. It is the "server" that players communicate with to sync state information and make moves. Each lobby has its own unique gameroom.
+A `GameRoom` is a durable object class that handles the back end logic of your game. It is the "server" that players communicate with to sync state information and make moves. Each lobby has its own unique gameroom. Your game's back end simply extends GameRoom to get lots of useful functionality.
 
 ```typescript
 class MyGame extends GameRoom<MyGameConfig, GameState<MyState>>
@@ -25,12 +25,10 @@ class MyGame extends GameRoom<MyGameConfig, GameState<MyState>>
     override OnValidPlayerAction() {...}
     override OnGameTick() {...}
     override OnStateUpdate() {...}
-    override OnGameStart() {...}
-    override OnGameEnd() {...}
     override OnPlayerReconnect() {...}
 }
 ```
-Players communicate with the GameRoom using an `Action`. Each action has a type (a string) and a payload, which is a partial `GameState` containing updated values.
+Players communicate with the GameRoom using an `Action`. Each action has a type (a string) and a payload, which is a partial `GameState` containing updated values. You can either apply the payload directly to the state, or you might want to mutate the state based on the Action's type.
 ```typescript
 class MyGame extends GameRoom<MyGameConfig, GameState<MyState>>
 {
@@ -45,17 +43,25 @@ class MyGame extends GameRoom<MyGameConfig, GameState<MyState>>
         return new ActionResult(false, "Not your turn!")
     }
 
-    // if ValidatePlayerAction is returns a valid ActionResult, the GameRoom uses its payload to mutate state
+    // if ValidatePlayerAction is returns a valid ActionResult, 
     override OnValidPlayerAction(action : Action) 
     {
+        //you can use its payload to mutate state directly
         this.state.UpdateState(action.payload)
+        
+        // or you can do your own thing!
+        if(action.type === "Increment")
+        {
+            this.state.incrementField("count", 1)
+        }
+
     }
 }
 ```
 ### GameState
 Each `GameRoom` keeps track of its `GameState`, which is an object representing the current state of the game. Your front end will care about how to display `GameState`. For a game of chess, your game state would probably be an array of all the moves taken in chess notation. 
 
-Since game state needs to be serialized, it must be composed only of JSON serializable types. 
+Since game state needs to be serialized, it must be composed only of JSON serializable types. Gamestate's state is changed through setters so that appropriate hooks can be called.
 ```typescript
 class GameState<T>
 {
@@ -65,8 +71,8 @@ class GameState<T>
         this.state = state
     }
 
-    override UpdateState(new : partial<T>) {...}
-    override GetState() {...}
+    UpdateState(new : partial<T>) {...}
+    GetState() {...}
 }
 ```
 ### Game Config
@@ -75,13 +81,20 @@ In addition to handling GameState, each `GameRoom` also has a customizable confi
 type BaseConfig = 
 {
     maxPlayers: number,
-    isPrivate: boolean, 
-    maxActionsPerSecond: number,
-    onRateLimitExceeded: "drop" | "kick" | "warn"
+    isPrivate: boolean
 }
 
-type MyGameConfig = BaseConfig & {maxItemCount: number, gridSize: number}
+type MyGameConfig = BaseConfig & 
+    {
+        maxItemCount: number, 
+        gridSize: number,
+        //whatever else you may need
+    }
 ```
 
-### Matchmaker
+### Utilities
+Game room comes bundled with a few utility durable objects that you can use if you want. You'll have to create bindings for these in your wrangler.toml if you plan on using them.
+#### MatchMaker
 A `MatchMaker` is a durable object class that handles matchmaking. It can assign players into queues and match them together into GameRooms. There should usually only be one matchmaker, but multiple can be used too.
+#### RateLimiter
+A `RateLimiter` is a durable object class that implements token bucket rate limiting. You can use a `RateLimiterClient` to query a `RateLimiter` per player to see if they are sending messages too fast.
