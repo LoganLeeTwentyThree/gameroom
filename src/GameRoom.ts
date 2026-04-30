@@ -1,15 +1,14 @@
 import { DurableObject } from "cloudflare:workers";
-import { GameState, FullState, Action, Player, Config, Result, JSONValue } from "./types"
+import { GameState, FullState, Action, Player, FullConfig, Result, JSONValue } from "./types"
 
 export abstract class GameRoom<Config, State extends Record<string, JSONValue>, Env = unknown> extends DurableObject<Env> {
     protected currentGameState : GameState<FullState<State>>
-    protected config : Config
+    protected config : FullConfig<Config>
 
     //----- DURABLE OBJECT LIFECYCLE -----
 
     constructor(ctx: DurableObjectState, env: Env) {
         super(ctx, env);
-        this.env = env;
 
         const oldState : FullState<State> | null | undefined = this.ctx.storage.kv.get("gamestate")
 
@@ -24,12 +23,11 @@ export abstract class GameRoom<Config, State extends Record<string, JSONValue>, 
         }
 
         this.config = this.getConfig()
-        
     }
 
     //User defines their state and config defaults in their child class
     abstract getInitialState(): FullState<State>
-    abstract getConfig() : Config
+    abstract getConfig() : FullConfig<Config>
 
     async fetch(request: Request): Promise<Response> {
         const url = new URL(request.url)
@@ -118,7 +116,6 @@ export abstract class GameRoom<Config, State extends Record<string, JSONValue>, 
         
     }
 
-
     /**
      * Closes a websocket.
      * 
@@ -148,6 +145,10 @@ export abstract class GameRoom<Config, State extends Record<string, JSONValue>, 
             playerMap: {
                 ...this.currentGameState.getStateValues().playerMap,
                 [player.id]: player
+            },
+            activePlayers: {
+                ...this.currentGameState.getStateValues().playerMap,
+                [player.id]: player
             }
         } as Partial<FullState<State>>)
 
@@ -158,6 +159,13 @@ export abstract class GameRoom<Config, State extends Record<string, JSONValue>, 
     private _OnPlayerLeave(player : Player)
     {
         this.currentGameState.decrementField("activePlayerCount", 1)
+
+        let newActivePlayers = this.currentGameState.getStateValues().activePlayers
+        delete newActivePlayers[player.id]
+
+        this.currentGameState.UpdateState({
+            activePlayers: newActivePlayers
+        } as FullState<State>)
 
         if(this.currentGameState.getField("activePlayerCount") == 0)
         {
@@ -263,6 +271,8 @@ export abstract class GameRoom<Config, State extends Record<string, JSONValue>, 
         {
             if(ws.deserializeAttachment().id === player.id)
             {
+                if(!ws.OPEN) { return {success: false, reason: "Player web socket not open."} as Result }
+
                 ws.send(message)
                 return {success: true} as Result
             }

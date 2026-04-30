@@ -2,6 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 
 export class Matchmaker<Env = unknown> extends DurableObject<Env>
 {
+    matchSize = 2
     constructor(ctx: DurableObjectState, env: Env) {
         super(ctx, env);
     }
@@ -39,8 +40,8 @@ export class Matchmaker<Env = unknown> extends DurableObject<Env>
 
         // match players in each queue
         for(const [queueNo, players] of queues) {
-            if(players.length >= 2) {
-                const matched = players.splice(0, 2)
+            if(players.length >= this.matchSize) {
+                const matched = players.splice(0, this.matchSize)
                 const lobbyId = crypto.randomUUID()
 
                 for(const ws of matched) {
@@ -52,8 +53,13 @@ export class Matchmaker<Env = unknown> extends DurableObject<Env>
         }
     }
 
+    async setMatchSize(size : number)
+    {
+        this.matchSize = size
+    }
+
     async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string) {
-        
+        return
     }
 
     async webSocketClose(

@@ -1,4 +1,8 @@
-export type Config = {}
+export type BaseConfig = {
+    doServerTick: boolean, // for realtime games, ther server needs to perform calculations on it own
+}
+
+export type FullConfig<Config> = Config & BaseConfig
 
 type JSONPrimitive = string | number | boolean | null;
 
@@ -80,5 +84,6 @@ export type Player = {
 
 export type BaseState = {
     activePlayerCount: number,
+    activePlayers: Record<string, Player>, 
     playerMap: Record<string, Player> 
 }
