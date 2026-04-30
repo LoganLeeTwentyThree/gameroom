@@ -1,19 +1,69 @@
 <!DOCTYPE html>
 <html>
 <body>
-    <button onclick="sendAction()">Increment</button>
-    <p id="count">0</p>
+    <div id="queue-screen">
+        <button onclick="joinQueue()">Find Game</button>
+        <p id="status">Press to find a game</p>
+    </div>
+
+    <div id="game-screen" style="display:none">
+        <h2>Counter Game</h2>
+        <p>Count: <span id="count">0</span></p>
+        <button onclick="increment()">Increment</button>
+        <p id="game-status"></p>
+    </div>
 
     <script>
-        const ws = new WebSocket("ws://localhost:8787/websocket")
+        let gameWs = null
 
-        ws.onmessage = (event) => {
-            const state = JSON.parse(event.data)
-            document.getElementById("count").innerText = state.count
+        function joinQueue() {
+            document.getElementById("status").innerText = "Searching for players..."
+            document.querySelector("button").disabled = true
+
+            const matchWs = new WebSocket("ws://localhost:8787/matchmaker?queue=0")
+
+            matchWs.onmessage = (event) => {
+                const message = JSON.parse(event.data)
+
+                if(message.command === "Match") {
+                    document.getElementById("status").innerText = "Match found!"
+                    matchWs.close()
+                    joinLobby(message.lobby)
+                }
+            }
+
+            matchWs.onerror = () => {
+                document.getElementById("status").innerText = "Error connecting to matchmaker"
+                document.querySelector("button").disabled = false
+            }
         }
 
-        function sendAction() {
-            ws.send(JSON.stringify({ type: "INCREMENT", payload: {} }))
+        function joinLobby(lobbyId) {
+            gameWs = new WebSocket("ws://localhost:8787/websocket?lobby=" + lobbyId)
+
+            gameWs.onopen = () => {
+                document.getElementById("queue-screen").style.display = "none"
+                document.getElementById("game-screen").style.display = "block"
+                document.getElementById("game-status").innerText = "Connected to lobby: " + lobbyId
+            }
+
+            gameWs.onmessage = (event) => {
+                const data = JSON.parse(event.data)
+                console.log(data)
+                if(data.state && data.state.count !== undefined) {
+                    document.getElementById("count").innerText = data.state.count
+                }
+            }
+
+            gameWs.onclose = () => {
+                document.getElementById("game-status").innerText = "Disconnected"
+            }
+        }
+
+        function increment() {
+            if(gameWs && gameWs.readyState === WebSocket.OPEN) {
+                gameWs.send(JSON.stringify({ type: "INCREMENT", payload: {} }))
+            }
         }
     </script>
 </body>

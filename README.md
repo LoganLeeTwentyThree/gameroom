@@ -79,10 +79,4 @@ type MyGameConfig = BaseConfig & {maxItemCount: number, gridSize: number}
 ```
 
 ### Matchmaker
-A `MatchMaker` is a durable object class that handles matchmaking. It can assign players into queues and match them together into GameRooms.
-```typescript
-class MyMatchMaker extends Matchmaker
-{
-    ///TODO
-}
-```
+A `MatchMaker` is a durable object class that handles matchmaking. It can assign players into queues and match them together into GameRooms. There should usually only be one matchmaker, but multiple can be used too.

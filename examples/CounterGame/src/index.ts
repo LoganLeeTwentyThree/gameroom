@@ -1,5 +1,6 @@
 
 import { GameRoom } from "../../../src/GameRoom.js";
+export { Matchmaker } from '../../../src/MatchMaker.js'
 import { Action, FullState, Player, Result } from "../../../src/types.js";
 import html from "../public/index.html"
 
@@ -47,11 +48,18 @@ export default {
     async fetch(request: Request, env: Env) {
         const url = new URL(request.url)
 
+        if(url.pathname === "/matchmaker") {
+            const id = env.MATCHMAKER.idFromName("global")
+            const stub = env.MATCHMAKER.get(id)
+            return stub.fetch(request)
+        }
+
         if(url.pathname === "/websocket") {
             if(request.headers.get("Upgrade") !== "websocket") {
                 return new Response("Expected WebSocket", { status: 426 })
             }
-            const id = env.COUNTER_ROOM.idFromName("test-room")
+            const lobbyId = url.searchParams.get("lobby") ?? "default"
+            const id = env.COUNTER_ROOM.idFromName(lobbyId)
             const stub = env.COUNTER_ROOM.get(id)
             return stub.fetch(request)
         }
@@ -61,3 +69,6 @@ export default {
         })
     }
 }
+
+
+

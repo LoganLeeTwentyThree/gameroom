@@ -5,6 +5,8 @@ export abstract class GameRoom<Config, State, Env = unknown> extends DurableObje
     protected currentGameState : GameState<FullState<State>>
     protected config : Config
 
+    //----- DURABLE OBJECT LIFECYCLE -----
+
     constructor(ctx: DurableObjectState, env: Env) {
         super(ctx, env);
 
@@ -13,10 +15,10 @@ export abstract class GameRoom<Config, State, Env = unknown> extends DurableObje
         //if there is existing state and one or more existing websocket connections
         if(oldState && this.ctx.getWebSockets().length > 0)
         {
-            this.currentGameState = new GameState<FullState<State>>(this._OnStateUpdate, oldState)
+            this.currentGameState = new GameState<FullState<State>>(() => this._OnStateUpdate(), oldState)
         }else 
         {
-            this.currentGameState = new GameState<FullState<State>>(this._OnStateUpdate, this.getInitialState())
+            this.currentGameState = new GameState<FullState<State>>(() => this._OnStateUpdate(), this.getInitialState())
             this.onRoomStart()
         }
 
@@ -27,8 +29,6 @@ export abstract class GameRoom<Config, State, Env = unknown> extends DurableObje
     //User defines their state and config defaults in their child class
     abstract getInitialState(): FullState<State>
     abstract getConfig() : Config
-
-    //----- DURABLE OBJECT LIFECYCLE -----
 
     async fetch(request: Request): Promise<Response> {
         const url = new URL(request.url)
@@ -96,10 +96,17 @@ export abstract class GameRoom<Config, State, Env = unknown> extends DurableObje
                 this.onValidPlayerAction(player, action)
             }else
             {
-                ws.send(JSON.stringify({ error: result.reason }))
+                if(ws.OPEN)
+                {
+                    ws.send(JSON.stringify({ error: result.reason }))
+                }
+                
             }
         } catch (e) {
-            ws.send(JSON.stringify({ error: "Invalid message format" }))
+            if(ws.OPEN)
+            {
+                ws.send(JSON.stringify({ error: "Invalid message format" }))
+            }
         }
         
     }
@@ -153,7 +160,10 @@ export abstract class GameRoom<Config, State, Env = unknown> extends DurableObje
     {
         for(const ws of this.ctx.getWebSockets())
         {
-            ws.send(JSON.stringify(this.currentGameState.getStateValues()))
+            if(ws.OPEN)
+            {
+                ws.send(JSON.stringify({ state: this.currentGameState.getStateValues() } ))
+            }
         }
 
         this.onStateUpdate()
