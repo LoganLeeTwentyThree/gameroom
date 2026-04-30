@@ -1,7 +1,7 @@
 # Gameroom
 Gameroom is a typescript package that makes building games with Cloudflare's Durable Objects easier. With Gameroom, you don't have to worry about the Durable Object lifecycle, and you can focus more on building your game.
 ## Installation and Usage
-`npm install gameroom`
+`npm install @loganlee23/gameroom`
 
 TODO :)
 
