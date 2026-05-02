@@ -1,46 +1,98 @@
 # Gameroom
 Gameroom is a typescript package that makes building games with Cloudflare's Durable Objects easier. With Gameroom, you don't have to worry about the Durable Object lifecycle, and you can focus more on building your game.
-## Installation and Usage
-`npm install @loganlee23/gameroom`
+## Installation
+Run `npm install @loganlee23/gameroom`
 
-TODO :)
+## Quick Start
+
+In `src/index.ts`
+1. Import gameroom and its types 
+`import * as gr from "@loganlee23/gameroom";`
+
+2. Define your game's state
+```typescript
+type MyState = 
+{
+    count: number,
+    //whatever you need for your game
+}
+```
+
+3. Extend the `GameRoom` class and implement the required hooks
+```typescript
+class MyGame<Env> extends GameRoom<GameState<MyState>, Env>
+{
+    constructor(ctx: DurableObjectState, env: Env)
+    {
+        //GameRoom's constructor handles state between hibernations for you
+        super(ctx, env)
+    }
+
+    //Anyone can join at any time 
+    public validatePlayerTryJoin() : Result 
+    { return {sucess: true} }
+
+    //All actions are legal
+    public validatePlayerAction(player : Player, action : Action<FullState<State>>) : Result 
+    { return {success: true} }
+
+    //All actions mutate state directly
+    public onValidPlayerAction(player : Player, action : Action<FullState<State>>) : void 
+    {
+        this.currentGameState.updateState(action.payload)
+    }
+}
+```
+
+4. Create your worker to route requests
+```typescript
+export default 
+{
+    async fetch(request: Request, env: Env) {
+        const url = new URL(request.url)
+
+        if(url.pathname === "/websocket") {
+            if(request.headers.get("Upgrade") !== "websocket") {
+                return new Response("Expected WebSocket", { status: 426 })
+            }
+            const lobbyId = url.searchParams.get("lobby") ?? "default"
+            const id = env.MY_GAME.idFromName(lobbyId)
+            const stub = env.MY_GAME.get(id)
+            return stub.fetch(request)
+        }
+
+        return await env.ASSETS.fetch(request)
+    }
+}
+```
+Make sure you have your wrangler file and run `npx wrangler types` to generate your types.
+
+5. Your back end is done 🎉.
+
+You can design your front end however you'd like, but it would be helpful to import your game state type definition for use there too. 
+
+Put any static files in the `public` directory of your project and that content will be served by your worker. Connect to a specific room with a websocket connection and send actions however you wish. Each client will automatically recieve an updated copy of the game state whenever it changes. 
+
+(run `npx wrangler dev` to test it out)
+
 
 ## Features
 ### Gameroom
 A `GameRoom` is a durable object class that handles the back end logic of your game. It is the "server" that players communicate with to sync state information and make moves. Each lobby has its own unique gameroom. Your game's back end simply extends GameRoom to get lots of useful functionality.
 
-```typescript
-class MyGame extends GameRoom<MyGameConfig, GameState<MyState>>
-{
-    constructor(ctx: DurableObjectState, env: Env)
-    {
-        //GameRoom's constructor handles deserializing state for you
-        super(ctx, env)
-    }
-
-    //lots of helpful hooks for running a game!
-    override OnPlayerJoin() {...}
-    override OnPlayerLeave() {...}
-    override ValidatePlayerAction() {...}
-    override OnValidPlayerAction() {...}
-    override OnGameTick() {...}
-    override OnStateUpdate() {...}
-    override OnPlayerReconnect() {...}
-}
-```
 Players communicate with the GameRoom using an `Action`. Each action has a type (a string) and a payload, which is a partial `GameState` containing updated values. You can either apply the payload directly to the state, or you might want to mutate the state based on the Action's type.
 ```typescript
-class MyGame extends GameRoom<MyGameConfig, GameState<MyState>>
+class MyGame<Env> extends GameRoom<MyGameConfig, GameState<MyState>, Env>
 {
     // use OnPlayerAction to validate player actions before they're used to mutate state
     override ValidatePlayerAction(player: Player, action : Action) : ActionResult
     {
         if(IsPlayerTurn(player) && action.type == "MOVE") //Validate however you want
         {
-            return new ActionResult(true)
+            return {success: true}
         }
 
-        return new ActionResult(false, "Not your turn!")
+        return {sucess: false, reason: "Not your turn!"}
     }
 
     // if ValidatePlayerAction is returns a valid ActionResult, 
@@ -62,21 +114,9 @@ class MyGame extends GameRoom<MyGameConfig, GameState<MyState>>
 Each `GameRoom` keeps track of its `GameState`, which is an object representing the current state of the game. Your front end will care about how to display `GameState`. For a game of chess, your game state would probably be an array of all the moves taken in chess notation. 
 
 Since game state needs to be serialized, it must be composed only of JSON serializable types. Gamestate's state is changed through setters so that appropriate hooks can be called.
-```typescript
-class GameState<T>
-{
-    let state
-    constructor(state: T)
-    {
-        this.state = state
-    }
 
-    UpdateState(new : partial<T>) {...}
-    GetState() {...}
-}
-```
 ### Game Config
-In addition to handling GameState, each `GameRoom` also has a customizable configuratuion. By setting the room's config, you can set your desired rate limits, player count, or anything else you might need.
+In addition to handling GameState, each `GameRoom` also has a customizable configuratuion. By setting the room's config, you can set your player count, lobby privacy, or anything else you might need.
 ```typescript
 type BaseConfig = 
 {

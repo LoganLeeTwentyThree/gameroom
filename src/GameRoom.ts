@@ -1,7 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import { GameState, FullState, Action, Player, FullConfig, Result, JSONValue } from "./types"
 
-export abstract class GameRoom<Config, State extends Record<string, JSONValue>, Env = unknown> extends DurableObject<Env> {
+export abstract class GameRoom<State extends Record<string, JSONValue>, Config = {}, Env = unknown> extends DurableObject<Env> {
     protected currentGameState : GameState<FullState<State>>
     protected config : FullConfig<Config>
 
@@ -141,6 +141,7 @@ export abstract class GameRoom<Config, State extends Record<string, JSONValue>, 
     {
         this.currentGameState.incrementField("activePlayerCount", 1)
 
+        //add player to the map and active players list
         this.currentGameState.UpdateState({
             playerMap: {
                 ...this.currentGameState.getStateValues().playerMap,
@@ -188,9 +189,9 @@ export abstract class GameRoom<Config, State extends Record<string, JSONValue>, 
                 {
                     ws.send(JSON.stringify({ state: this.currentGameState.getStateValues() } ))
                 }
-            }catch
+            }catch (e)
             {
-                //do.. something?
+                console.log(e)
             }
             
         }

@@ -1,8 +1,7 @@
 
 import { GameRoom } from "../../../src/GameRoom.js";
 export { Matchmaker } from '../../../src/MatchMaker.js'
-import { Action, FullState, Player, Result } from "../../../src/types.js";
-import html from "../public/index.html"
+import { Action, FullConfig, FullState, Player, Result } from "../../../src/types.js";
 
 
 type CounterRoomConfig = {
@@ -13,13 +12,13 @@ type CounterRoomState = {
     count: number
 }
 
-export class CounterRoom extends GameRoom<CounterRoomConfig, CounterRoomState, Env>
+export class CounterRoom extends GameRoom<CounterRoomState, CounterRoomConfig, Env>
 {
 
-    getConfig(): CounterRoomConfig {
+    getConfig(): FullConfig<CounterRoomConfig> {
         return {
             maxCount: 10
-        }
+        } as FullConfig<CounterRoomConfig>
     }
 
     public validatePlayerTryJoin(): Result {
@@ -68,9 +67,9 @@ export default {
             return stub.fetch(request)
         }
 
-        return new Response(html, {
-            headers: { "Content-Type": "text/html" }
-        })
+        
+
+        return await env.ASSETS.fetch(request)
     }
 }
 

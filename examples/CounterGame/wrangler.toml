@@ -13,3 +13,7 @@ class_name = "Matchmaker"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["CounterRoom", "Matchmaker"]
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
