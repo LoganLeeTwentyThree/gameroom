@@ -1,0 +1,10 @@
+{
+    "name": "RealTimeGame",
+    "devDependencies": {
+        "@loganlee23/gameroom": "../../"
+    },
+    "type": "module",
+    "dependencies": {
+        "wrangler": "^4.87.0"
+    }
+}

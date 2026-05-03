@@ -1,7 +1,7 @@
 
 import { GameRoom } from "../../../src/GameRoom.js";
 export { Matchmaker } from '../../../src/MatchMaker.js'
-import { Action, FullConfig, FullState, Player, Result } from "../../../src/types.js";
+import { Action, BaseState, Player, Result } from "../../../src/types.js";
 
 
 type CounterRoomConfig = {
@@ -15,24 +15,24 @@ type CounterRoomState = {
 export class CounterRoom extends GameRoom<CounterRoomState, CounterRoomConfig, Env>
 {
 
-    getConfig(): FullConfig<CounterRoomConfig> {
+    getConfig(): CounterRoomConfig {
         return {
             maxCount: 10
-        } as FullConfig<CounterRoomConfig>
+        } as CounterRoomConfig
     }
 
     public validatePlayerTryJoin(): Result {
         return {success: true}
     }
 
-    public validatePlayerAction(player: Player, action: Action<FullState<CounterRoomState>>): Result {
+    public validatePlayerAction(player: Player, action: Action<CounterRoomState>): Result {
         if(this.currentGameState.getField("count") >= this.config.maxCount) {
             return { success: false, reason: "Max count reached" }
         }
         return { success: true }
     }
 
-    public onValidPlayerAction(player: Player, action: Action<FullState<CounterRoomState>>): void {
+    public onValidPlayerAction(player: Player, action: Action<CounterRoomState>): void {
         this.currentGameState.incrementField("count")
     }
 
@@ -40,10 +40,10 @@ export class CounterRoom extends GameRoom<CounterRoomState, CounterRoomConfig, E
         console.log(player.id + " just reconnected");
     }
 
-    getInitialState(): FullState<CounterRoomState> {
+    getInitialState(): CounterRoomState & BaseState{
         return {
             count: 0
-        } as FullState<CounterRoomState>
+        } as CounterRoomState & BaseState
     }
 }
 

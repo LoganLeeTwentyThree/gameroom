@@ -1,6 +1,6 @@
 {
   "name": "@loganlee23/gameroom",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "description": "Gameroom helps you build games with Durable Objects",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -10,7 +10,9 @@
     "url": "https://github.com/LoganLeeTwentyThree/gameroom"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "prepublishOnly": "tsc"
   },
   "author": "Logan Williams",
   "license": "ISC",

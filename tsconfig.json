@@ -15,6 +15,8 @@
     // "types": ["node"],
     // and npm install -D @types/node
 
+    "outDir": "./dist",
+
     // Other Outputs
     "sourceMap": true,
     "declaration": true,

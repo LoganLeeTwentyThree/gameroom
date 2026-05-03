@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <h2>Realtime Test</h2>
+    <p>Server Ticks: <span id="ticks">0</span></p>
+    <p>Last Tick: <span id="lastTick">-</span></p>
+
+    <script>
+        const ws = new WebSocket("ws://localhost:8787/websocket")
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data)
+            if(data.state.ticks !== undefined) {
+                document.getElementById("ticks").innerText = data.state.ticks
+                document.getElementById("lastTick").innerText = new Date().toLocaleTimeString()
+            }
+        }
+
+        ws.onclose = () => {
+            document.getElementById("lastTick").innerText = "Disconnected"
+        }
+    </script>
+</body>
+</html>
