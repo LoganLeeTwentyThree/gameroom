@@ -34,7 +34,9 @@ export class RateLimiter<Env = unknown> extends DurableObject<Env>
     }
 }
 
-// RateLimiterClient implements rate limiting logic on the caller's side.
+/** 
+* RateLimiterClient implements rate limiting logic on the caller's side.
+*/
 export class RateLimiterClient {
     inCooldown : boolean = false
     limiter: DurableObjectStub<RateLimiter>

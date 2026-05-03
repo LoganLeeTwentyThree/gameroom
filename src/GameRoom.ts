@@ -1,7 +1,10 @@
 import { DurableObject } from "cloudflare:workers";
-import { GameState, Action, Player, Result, JSONValue, BaseState } from "./types"
+import { GameState, Action, ActionMap, Player, Result, JSONValue, BaseState } from "./types.js"
 
-export abstract class GameRoom<State extends Record<string, JSONValue>, Config = {}, Env = unknown> extends DurableObject<Env> {
+/**
+ * A lobby that tracks state and invokes hooks for your game.
+ */
+export abstract class GameRoom<State extends Record<string, JSONValue>, Actions extends ActionMap, Config = {}, Env = unknown> extends DurableObject<Env> {
     protected baseState : BaseState
     protected currentGameState : GameState<State>
     protected config : Config
@@ -14,6 +17,7 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Config =
         const oldState : State | null | undefined = this.ctx.storage.kv.get("gamestate")
         const oldBaseState : BaseState | null | undefined = this.ctx.storage.kv.get("basestate")
 
+        //if we are being reconstructed after hibernation, we restore the old state from pre hibernation
         if(oldBaseState)
         {
             this.baseState = oldBaseState
@@ -26,7 +30,6 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Config =
             }
         }
 
-        //if there is existing state and one or more existing websocket connections
         if(oldState && this.ctx.getWebSockets().length > 0)
         {
             this.currentGameState = new GameState<State>(() => this._OnStateUpdate(), oldState)
@@ -36,10 +39,7 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Config =
             this.onRoomStart()
         }
 
-
-
-
-
+        // set the config according to user defined config 
         this.config = this.getConfig()
     }
 
@@ -74,6 +74,7 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Config =
         const webSocketPair = new WebSocketPair();
         const [client, server] = Object.values(webSocketPair) as [WebSocket, WebSocket]
 
+        //check if this is a reconnect or a new player
         const existingId = url.searchParams.get("playerId")
         const existingPlayer = existingId 
             ? this.baseState.playerMap[existingId]
@@ -82,7 +83,7 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Config =
         const player: Player = existingPlayer ?? {
             name: url.searchParams.get("playerName") ?? "Player",
             id: crypto.randomUUID(),
-            ip: request.headers.get("CF-Connecting-IP") ?? "0.0.0.0"
+            ip: request.headers.get("CF-Connecting-IP") ?? "0.0.0.0" // for use with rate limiting
         }
 
         server.serializeAttachment(player)
@@ -110,7 +111,7 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Config =
      */
     async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string) {
         try {
-            const action = JSON.parse(message as string) as Action<State & BaseState>
+            const action = JSON.parse(message as string) as Action<ActionMap>
             const player : Player = ws.deserializeAttachment()
             const result : Result = this.validatePlayerAction(player, action)
 
@@ -120,7 +121,6 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Config =
             }else
             {
                 this.safeWsSend(ws, { error: result.reason })
-                
             }
         } catch (e) {
             this.safeWsSend(ws, { error: "Invalid message format" })
@@ -132,7 +132,7 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Config =
     {
         try
         {
-            ws.send(JSON.stringify(message))
+            ws.send(JSON.stringify({ message, playerId: ws.deserializeAttachment().id }))
         }catch
         {
             return 
@@ -153,7 +153,13 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Config =
     reason: string,
     wasClean: boolean,
     ) {
-        ws.close(code, reason);
+        try{
+            ws.close(code, reason);
+        }catch
+        {
+            //shhh
+        }
+        
 
         //prevents infinite closeRoom -> onPlayerLeave loop
         if(this.getActivePlayers().length > 0)
@@ -208,9 +214,9 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Config =
     {
         for(const ws of this.ctx.getWebSockets())
         {
-            
-            this.safeWsSend(ws, { state: this.currentGameState.getStateValues() })
-            
+            //dont send the secrets!
+            const { secrets: secrets, ...safeState } = this.currentGameState.getStateValues()
+            this.safeWsSend(ws, { state: safeState })
         }
 
         this.ctx.storage.put("gamestate", this.currentGameState.getStateValues())
@@ -265,7 +271,7 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Config =
      * @param action - The state change that the player is attempting.
      * @returns an error Result if the Action is invalid, and a success result otherwise
      */
-    public abstract validatePlayerAction(player : Player, action : Action<State & BaseState>) : Result
+    public abstract validatePlayerAction(player : Player, action : Action<ActionMap>) : Result
    
     /**
      * Called when a valid player action is processed.
@@ -273,7 +279,7 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Config =
      * @param player - The player who did the action.
      * @param action - The state change that the player requested.
      */
-    public abstract onValidPlayerAction(player : Player, action : Action<State & BaseState>) : void 
+    public abstract onValidPlayerAction(player : Player, action : Action<ActionMap>) : void 
 
     /**
      * Called when the room's state updates.

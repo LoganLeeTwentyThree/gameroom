@@ -16,11 +16,7 @@ export class GameState<State extends Record<string, JSONValue>>
     private onStateChanged: () => void
     constructor(onStateChanged: () => void, existingState: State)
     {
-
-       
         this.values = existingState
-        
-
         this.onStateChanged = onStateChanged
     }
 
@@ -52,10 +48,28 @@ export class GameState<State extends Record<string, JSONValue>>
 
 }
 
-export type Action<State extends Record<string, JSONValue>> = {
-    type: string,
-    payload: Partial<State>
-}
+/**
+ * A map of action type strings to their payload shapes.
+ * 
+ * @example
+ * type MyActions = {
+ *   MOVE: { x: number, y: number },
+ *   CHAT: { message: string },
+ *   RESIGN: never,
+ * }
+ */
+export type ActionMap = Record<string, JSONValue | never>
+
+/**
+ * Discriminated union of all actions derived from an ActionMap.
+ * Each member has a `type` key and a `payload` key typed to match.
+ * Actions whose payload is `never` have no `payload` property.
+ */
+export type Action<Actions extends ActionMap> = {
+    [K in keyof Actions]: Actions[K] extends never
+        ? { type: K }
+        : { type: K; payload: Actions[K] }
+}[keyof Actions]
 
 export type Result = 
 {

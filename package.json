@@ -1,6 +1,6 @@
 {
   "name": "@loganlee23/gameroom",
-  "version": "1.0.4",
+  "version": "1.0.44",
   "description": "Gameroom helps you build games with Durable Objects",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -19,5 +19,6 @@
   "dependencies": {
     "@cloudflare/workers-types": "^4.20260426.1",
     "typescript": "^6.0.3"
-  }
+  },
+  "type": "module"
 }
