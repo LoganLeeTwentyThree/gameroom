@@ -184,7 +184,7 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
         }
             
         this.baseState.activePlayers = {
-            ...this.baseState.playerMap,
+            ...this.baseState.activePlayers,
             [player.id]: player
         }
         
@@ -219,8 +219,8 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
             this.safeWsSend(ws, { state: safeState })
         }
 
-        this.ctx.storage.put("gamestate", this.currentGameState.getStateValues())
-        this.ctx.storage.put("basestate", this.baseState)
+        this.ctx.storage.kv.put("gamestate", this.currentGameState.getStateValues())
+        this.ctx.storage.kv.put("basestate", this.baseState)
 
         this.onStateUpdate()
     }
