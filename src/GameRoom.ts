@@ -1,4 +1,4 @@
-import { DurableObject } from "cloudflare:workers";
+import { DurableObject } from "cloudflare:workers"
 import { GameState, Action, ActionMap, Player, Result, JSONValue, BaseState } from "./types.js"
 
 /**

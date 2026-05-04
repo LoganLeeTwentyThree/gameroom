@@ -9,18 +9,25 @@ In `src/index.ts`
 1. Import gameroom and its types 
 `import * as gr from "@loganlee23/gameroom";`
 
-2. Define your game's state
+2. Define your game's state and message structure
 ```typescript
+
 type MyState = 
 {
     count: number,
     //whatever you need for your game
 }
+
+// Define all actions and their payload shapes here.
+// Use `never` for actions that carry no payload.
+type MyActions = {
+    INCREASE: { count: string },
+}
 ```
 
 3. Extend the `GameRoom` class and implement the required hooks
 ```typescript
-class MyGame<Env> extends GameRoom<GameState<MyState>, Env>
+class MyGame<Env> extends GameRoom<MyState, MyActions, {}, Env>
 {
     constructor(ctx: DurableObjectState, env: Env)
     {
@@ -36,10 +43,14 @@ class MyGame<Env> extends GameRoom<GameState<MyState>, Env>
     public validatePlayerAction(player : Player, action : Action<FullState<State>>) : Result 
     { return {success: true} }
 
-    //All actions mutate state directly
+    //This game just counts how lets players increase a number (is that a game?)
     public onValidPlayerAction(player : Player, action : Action<FullState<State>>) : void 
     {
-        this.currentGameState.updateState(action.payload)
+        if(action.type === "INCREASE")
+        {
+            this.currentGameState.incrementField("count", action.payload.count )
+        }
+        
     }
 }
 ```
@@ -69,7 +80,7 @@ Make sure you have your wrangler file and run `npx wrangler types` to generate y
 
 5. Your back end is done 🎉.
 
-You can design your front end however you'd like, but it would be helpful to import your game state type definition for use there too. 
+You can design your front end however you'd like. Make sure that you communicate with the server with the same Action Shape that you already defined.
 
 Put any static files in the `public` directory of your project and that content will be served by your worker. Connect to a specific room with a websocket connection and send actions however you wish. Each client will automatically recieve an updated copy of the game state whenever it changes. 
 
@@ -80,14 +91,14 @@ Put any static files in the `public` directory of your project and that content 
 ### Gameroom
 A `GameRoom` is a durable object class that handles the back end logic of your game. It is the "server" that players communicate with to sync state information and make moves. Each lobby has its own unique gameroom. Your game's back end simply extends GameRoom to get lots of useful functionality.
 
-Players communicate with the GameRoom using an `Action`. Each action has a type (a string) and a payload, which is a partial `GameState` containing updated values. You can either apply the payload directly to the state, or you might want to mutate the state based on the Action's type.
+Players communicate with the GameRoom using an `Action`. Each action has a type (a string) and a payload, which is an object that represents the game action that is to be performed, should the server accept it. 
 ```typescript
-class MyGame<Env> extends GameRoom<MyGameConfig, GameState<MyState>, Env>
+class MyGame<Env> extends GameRoom<MyState, MyActions, MyConfig, Env>
 {
     // use OnPlayerAction to validate player actions before they're used to mutate state
     override ValidatePlayerAction(player: Player, action : Action) : ActionResult
     {
-        if(IsPlayerTurn(player) && action.type == "MOVE") //Validate however you want
+        if(isPlayerTurn(player) && action.type == "MOVE") //Validate however you want
         {
             return {success: true}
         }
@@ -95,13 +106,10 @@ class MyGame<Env> extends GameRoom<MyGameConfig, GameState<MyState>, Env>
         return {sucess: false, reason: "Not your turn!"}
     }
 
-    // if ValidatePlayerAction is returns a valid ActionResult, 
-    override OnValidPlayerAction(action : Action) 
+    // if validatePlayerAction is returns a valid ActionResult, 
+    override onValidPlayerAction(action : Action) 
     {
-        //you can use its payload to mutate state directly
-        this.state.UpdateState(action.payload)
-        
-        // or you can do your own thing!
+        //you can use its payload to mutate state 
         if(action.type === "Increment")
         {
             this.state.incrementField("count", 1)
@@ -124,12 +132,12 @@ type BaseConfig =
     isPrivate: boolean
 }
 
-type MyGameConfig = BaseConfig & 
-    {
-        maxItemCount: number, 
-        gridSize: number,
-        //whatever else you may need
-    }
+type MyGameConfig =
+{
+    maxItemCount: number, 
+    gridSize: number,
+    //whatever else you may need
+}
 ```
 
 ### Utilities
