@@ -141,6 +141,6 @@ type MyGameConfig =
 ```
 
 ### Utilities
-Game room comes bundled with a few utility durable objects that you can use if you want. You'll have to create bindings for these in your wrangler.toml if you plan on using them.
+Game room comes bundled with a MatchMaker durable object that you can use if you want. You'll have to create bindings for it in your wrangler.toml if you plan on using it. There may be more utilities in the future.
 #### MatchMaker
 A `MatchMaker` is a durable object class that handles matchmaking. It can assign players into queues and match them together into GameRooms. There should usually only be one matchmaker, but multiple can be used too.
