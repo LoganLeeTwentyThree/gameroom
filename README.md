@@ -43,7 +43,7 @@ class MyGame<Env> extends GameRoom<MyState, MyActions, {}, Env>
     public validatePlayerAction(player : Player, action : Action<FullState<State>>) : Result 
     { return {success: true} }
 
-    //This game just counts how lets players increase a number (is that a game?)
+    //This game just lets players increase a number (is that a game?)
     public onValidPlayerAction(player : Player, action : Action<FullState<State>>) : void 
     {
         if(action.type === "INCREASE")
