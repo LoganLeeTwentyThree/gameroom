@@ -144,5 +144,3 @@ type MyGameConfig =
 Game room comes bundled with a few utility durable objects that you can use if you want. You'll have to create bindings for these in your wrangler.toml if you plan on using them.
 #### MatchMaker
 A `MatchMaker` is a durable object class that handles matchmaking. It can assign players into queues and match them together into GameRooms. There should usually only be one matchmaker, but multiple can be used too.
-#### RateLimiter
-A `RateLimiter` is a durable object class that implements token bucket rate limiting. You can use a `RateLimiterClient` to query a `RateLimiter` per player to see if they are sending messages too fast.
