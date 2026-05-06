@@ -8,6 +8,10 @@ export class Matchmaker<Env = unknown> extends DurableObject<Env>
     }
 
     async fetch(request: Request): Promise<Response> {
+        if (request.headers.get("Upgrade") != "websocket") {
+            return new Response("Expected websocket", { status: 406 })
+        }
+        
         const url = new URL(request.url)
 
         const queueNo : string = url.searchParams.get("queue") ?? "0"; 
