@@ -110,21 +110,28 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
      * @param message - Message that was sent.
      */
     async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string) {
+        let action : Action<ActionMap>
         try {
-            const action = JSON.parse(message as string) as Action<ActionMap>
-            const player : Player = ws.deserializeAttachment()
-            const result : Result = await this.validatePlayerAction(player, action)
-
-            if(result.success)
-            {
-                this.onValidPlayerAction(player, action)
-            }else
-            {
-                this.safeWsSend(ws, { error: result.reason })
-            }
-        } catch (e) {
+            action = JSON.parse(message as string) as Action<ActionMap>
+        }catch (e)
+        {
+            console.log(e)
             this.safeWsSend(ws, { error: "Invalid message format" })
+            return
         }
+        
+             
+        const player : Player = ws.deserializeAttachment()
+        const result : Result = await this.validatePlayerAction(player, action)
+
+        if(result.success)
+        {
+            this.onValidPlayerAction(player, action)
+        }else
+        {
+            this.safeWsSend(ws, { error: result.reason })
+        }
+        
         
     }
 
