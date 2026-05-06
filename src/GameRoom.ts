@@ -113,7 +113,7 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
         try {
             const action = JSON.parse(message as string) as Action<ActionMap>
             const player : Player = ws.deserializeAttachment()
-            const result : Result = this.validatePlayerAction(player, action)
+            const result : Result = await this.validatePlayerAction(player, action)
 
             if(result.success)
             {
@@ -271,7 +271,7 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
      * @param action - The state change that the player is attempting.
      * @returns an error Result if the Action is invalid, and a success result otherwise
      */
-    public abstract validatePlayerAction(player : Player, action : Action<ActionMap>) : Result
+    public abstract validatePlayerAction(player : Player, action : Action<ActionMap>) : Promise<Result>
    
     /**
      * Called when a valid player action is processed.
