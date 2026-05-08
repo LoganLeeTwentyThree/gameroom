@@ -145,5 +145,7 @@ Game room comes bundled with a MatchMaker durable object that you can use if you
 #### MatchMaker
 A `MatchMaker` is a durable object class that handles matchmaking. It can assign players into queues and match them together into GameRooms. There should usually only be one matchmaker, but multiple can be used too.
 
+#### ChatRoom
+A `ChatRoom` is a durable object class that lets players chat with each other. You may want this for during or after your game, so players can chat. Usually, each room would have its own ChatRoom, but you can have a global one if you want.
 ## Examples
 Check out the [WordleVS](https://github.com/LoganLeeTwentyThree/wordle-versus) repo, which uses gameroom to create a simple two player version of wordle.
