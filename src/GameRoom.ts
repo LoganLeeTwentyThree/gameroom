@@ -110,9 +110,9 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
      * @param message - Message that was sent.
      */
     async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string) {
-        let action : Action<ActionMap>
+        let action : Action<Actions>
         try {
-            action = JSON.parse(message as string) as Action<ActionMap>
+            action = JSON.parse(message as string) as Action<Actions>
         }catch (e)
         {
             console.log(e)
@@ -277,7 +277,7 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
      * @param action - The state change that the player is attempting.
      * @returns an error Result if the Action is invalid, and a success result otherwise
      */
-    public abstract validatePlayerAction(player : Player, action : Action<ActionMap>) : Promise<Result>
+    public abstract validatePlayerAction(player : Player, action : Action<Actions>) : Promise<Result>
    
     /**
      * Called when a valid player action is processed.
@@ -285,7 +285,7 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
      * @param player - The player who did the action.
      * @param action - The state change that the player requested.
      */
-    public abstract onValidPlayerAction(player : Player, action : Action<ActionMap>) : void 
+    public abstract onValidPlayerAction(player : Player, action : Action<Actions>) : void 
 
     /**
      * Called when the room's state updates.

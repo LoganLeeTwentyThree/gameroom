@@ -36,6 +36,17 @@ export class GameState<State extends Record<string, JSONValue>>
         this.incrementField(key, -by)
     }
 
+    public pushToField<K extends keyof State>(
+        key: K,
+        item: State[K] extends (infer Item)[] ? Item : never
+    ): void {
+        const current = this.values[key]
+        if (!Array.isArray(current)) {
+            throw new Error(`Field "${String(key)}" is not an array`)
+        }
+        this.UpdateState({ [key]: [...current, item] } as Partial<State>)
+    }
+
     public getField<K extends keyof (State)>(key: K): (State)[K]
     {
         return this.values[key] as (State)[K]
