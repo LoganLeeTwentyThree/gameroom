@@ -5,7 +5,7 @@ import { GameState, Action, ActionMap, Player, Result, JSONValue, BaseState } fr
  * A lobby that tracks state and invokes hooks for your game.
  */
 export abstract class GameRoom<State extends Record<string, JSONValue>, Actions extends ActionMap, Config = {}, Env = unknown> extends DurableObject<Env> {
-    protected baseState : BaseState
+    private baseState : BaseState
     protected currentGameState : GameState<State>
     protected config : Config
 
@@ -194,7 +194,6 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
             ...this.baseState.activePlayers,
             [player.id]: player
         }
-        
 
         this._OnStateUpdate()
         this.onPlayerJoin(player)
