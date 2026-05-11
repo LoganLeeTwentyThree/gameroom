@@ -3,3 +3,4 @@ node_modules/
 /node_modules
 .wrangler
 notes
+worker-configuration.d.ts

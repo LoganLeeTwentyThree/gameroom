@@ -1,0 +1,13 @@
+{
+  "name": "counter-worker",
+  "main": "../src/index.ts",
+  "compatibility_date": "2026-05-10",
+  "durable_objects": {
+    "bindings": [
+      { "name": "CHAT_ROOM", "class_name": "ChatRoom" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["ChatRoom"] }
+  ]
+}

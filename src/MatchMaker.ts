@@ -1,6 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 
-export class Matchmaker<Env = unknown> extends DurableObject<Env>
+export class Matchmaker<Env> extends DurableObject<Env>
 {
     matchSize = 2
     constructor(ctx: DurableObjectState, env: Env) {
