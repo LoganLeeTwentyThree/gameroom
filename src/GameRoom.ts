@@ -135,14 +135,15 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
         
     }
 
-    safeWsSend(ws: WebSocket, message: JSONValue)
+    safeWsSend(ws: WebSocket, message: JSONValue) : Result
     {
         try
         {
             ws.send(JSON.stringify({ message, playerId: ws.deserializeAttachment().id }))
-        }catch
+            return {success: true}
+        }catch (e)
         {
-            return 
+            return {success: false, reason: e as string}
         }
     }
 

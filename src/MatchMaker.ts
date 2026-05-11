@@ -1,6 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 
-export class Matchmaker<Env> extends DurableObject<Env>
+export class MatchMaker<Env> extends DurableObject<Env>
 {
     matchSize = 2
     constructor(ctx: DurableObjectState, env: Env) {
@@ -44,14 +44,19 @@ export class Matchmaker<Env> extends DurableObject<Env>
 
         // match players in each queue
         for(const [queueNo, players] of queues) {
-            if(players.length >= this.matchSize) {
+            while(players.length >= this.matchSize) {
                 const matched = players.splice(0, this.matchSize)
                 const lobbyId = crypto.randomUUID()
 
                 for(const ws of matched) {
-                    ws.serializeAttachment({ lobbyId })
-                    ws.send(JSON.stringify({ command: "Match", lobby: lobbyId }))
-                    this.webSocketClose(ws, 1000, "Matched", false)
+                    try {
+                        ws.serializeAttachment({ ...ws.deserializeAttachment(), matched: true })
+                        ws.send(JSON.stringify({ command: "Match", lobby: lobbyId }))
+                        ws.close(1000, "Matched")
+                    } catch {
+                        // socket already closed, skip
+                        continue
+                    }
                 }
             }
         }

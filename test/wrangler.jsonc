@@ -4,10 +4,11 @@
   "compatibility_date": "2026-05-10",
   "durable_objects": {
     "bindings": [
-      { "name": "CHAT_ROOM", "class_name": "ChatRoom" }
+      { "name": "CHAT_ROOM", "class_name": "ChatRoom" },
+      { "name": "MATCHMAKER", "class_name": "MatchMaker" }
     ]
   },
   "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["ChatRoom"] }
+    { "tag": "v1", "new_sqlite_classes": ["ChatRoom", "MatchMaker"] }
   ]
 }

@@ -4,13 +4,10 @@ import { runInDurableObject, listDurableObjectIds } from "cloudflare:test";
 import { ChatRoom } from "../src/index.js"
 
 describe("ChatRoom Durable Object", () => {
-
-    
+    const id = env.CHAT_ROOM.idFromName("test");
+    const stub = env.CHAT_ROOM.get(id);
 
     it("should instantiate the room", async () => {
-        const id = env.CHAT_ROOM.idFromName("test");
-        const stub = env.CHAT_ROOM.get(id);
-
         await runInDurableObject(stub, async (instance, state) => {
             expect(instance).toBeInstanceOf(ChatRoom);
         });
@@ -18,8 +15,6 @@ describe("ChatRoom Durable Object", () => {
     });
 
     it("should reject invalid messages", async () => {
-        const id = env.CHAT_ROOM.idFromName("test");
-        const stub = env.CHAT_ROOM.get(id);
 
         await runInDurableObject(stub, async (instance, state) => {
             const response = await instance.fetch!(
@@ -45,9 +40,6 @@ describe("ChatRoom Durable Object", () => {
     });
 
     it("should let chatters freely join and chat", async () => {
-        const id = env.CHAT_ROOM.idFromName("test");
-        const stub = env.CHAT_ROOM.get(id);
-
         await runInDurableObject(stub, async (instance, state) => {
             const response = await instance.validatePlayerTryJoin()
             expect(response).toStrictEqual({success: true});
@@ -60,9 +52,6 @@ describe("ChatRoom Durable Object", () => {
     })
 
     it("should update chat history when chats are sent", async () => {
-        const id = env.CHAT_ROOM.idFromName("test");
-        const stub = env.CHAT_ROOM.get(id);
-
         await runInDurableObject(stub, async (instance, state) => {
             const response = await instance.fetch!(
                 new Request("https://example.com/websocket", {
@@ -80,8 +69,6 @@ describe("ChatRoom Durable Object", () => {
     })
 
     it("should push out state changes", async () => {
-        const id = env.CHAT_ROOM.idFromName("test");
-        const stub = env.CHAT_ROOM.get(id);
 
         await runInDurableObject(stub, async (instance, state) => {
             const response = await instance.fetch!(
@@ -102,6 +89,24 @@ describe("ChatRoom Durable Object", () => {
             expect(sent[0].message.state.chats[0].body).toStrictEqual(`Hello`)
         });
     })
+
+    it("should persist state through hibernation", async () => {
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        await sleep(10000) // 10 secs -> hibernation started
+
+        await runInDurableObject(stub, async (instance, state) => {
+            const response = await instance.fetch!(
+                new Request("https://example.com/websocket", {
+                    headers: { "Upgrade": "websocket" },
+                })
+            );
+
+            expect(instance.currentGameState.getStateValues().chats[0].body).toStrictEqual(`Hello`)
+        });
+
+
+    }, 11_000)
 
   
 });
