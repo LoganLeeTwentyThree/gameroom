@@ -1,6 +1,6 @@
 {
   "name": "@loganlee23/gameroom",
-  "version": "1.0.61",
+  "version": "1.0.7",
   "description": "Gameroom helps you build games with Durable Objects",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
