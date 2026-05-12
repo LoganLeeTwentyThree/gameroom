@@ -6,7 +6,7 @@ import { GameState, Action, ActionMap, Player, Result, JSONValue, BaseState } fr
  */
 export abstract class GameRoom<State extends Record<string, JSONValue>, Actions extends ActionMap, Config, Env> extends DurableObject<Env> {
     private baseState : BaseState
-    protected currentGameState : GameState<State>
+    protected readonly currentGameState : GameState<State>
     protected config : Config
 
     //----- DURABLE OBJECT LIFECYCLE -----

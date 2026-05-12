@@ -2,9 +2,11 @@ import { DurableObject } from "cloudflare:workers";
 
 export class MatchMaker<Env> extends DurableObject<Env>
 {
-    matchSize = 2
+    matchSize : number
     constructor(ctx: DurableObjectState, env: Env) {
         super(ctx, env);
+
+        this.matchSize = this.ctx.storage.kv.get("size") ?? 2
     }
 
     async fetch(request: Request): Promise<Response> {
@@ -65,6 +67,7 @@ export class MatchMaker<Env> extends DurableObject<Env>
     async setMatchSize(size : number)
     {
         this.matchSize = size
+        this.ctx.storage.kv.put("size", size)
     }
 
     async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string) {
