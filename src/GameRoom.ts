@@ -4,7 +4,7 @@ import { GameState, Action, ActionMap, Player, Result, JSONValue, BaseState } fr
 /**
  * A lobby that tracks state and invokes hooks for your game.
  */
-export abstract class GameRoom<State extends Record<string, JSONValue>, Actions extends ActionMap, Config = {}, Env = unknown> extends DurableObject<Env> {
+export abstract class GameRoom<State extends Record<string, JSONValue>, Actions extends ActionMap, Config, Env> extends DurableObject<Env> {
     private baseState : BaseState
     protected currentGameState : GameState<State>
     protected config : Config
@@ -135,7 +135,7 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
         
     }
 
-    safeWsSend(ws: WebSocket, message: JSONValue) : Result
+    private safeWsSend(ws: WebSocket, message: JSONValue) : Result
     {
         try
         {
