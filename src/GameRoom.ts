@@ -182,8 +182,6 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
 
     private _OnPlayerJoin(player : Player)
     {
-        this.currentGameState.incrementField("activePlayerCount", 1)
-
         //add player to the map and active players list
         this.baseState.playerMap = 
         {
