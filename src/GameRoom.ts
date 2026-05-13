@@ -177,6 +177,19 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
         
     }
 
+    webSocketError(ws: WebSocket, error: unknown): void | Promise<void> {
+        try
+        {
+            const player = ws.deserializeAttachment() as Player
+            this.onPlayerError(player, error)
+        }catch
+        {
+            //if theres no player attached to the websocket, they didn't finish joining
+            return
+        }
+        
+    }
+
     // ----- PRIVATE ------
     // These are run before the hooks are invoked so that certain functionality is always run
 
@@ -251,16 +264,25 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
     /**
      * Called when a player joins the room.
      * 
+     * @param player - The player that errored.
+     * @param error - The error object provided by the DO runtime
+     */
+    public onPlayerError(player: Player, error: unknown) : Promise<void> | void {}
+
+
+    /**
+     * Called when a player joins the room.
+     * 
      * @param player - The player that joined.
      */
-    public onPlayerJoin(player : Player) : void {}
+    public onPlayerJoin(player : Player) : Promise<void> | void {}
 
     /**
      * Called when a player leaves the room.
      * 
      * @param player - The player that left.
      */
-    public onPlayerLeave(player : Player) : void {}
+    public onPlayerLeave(player : Player) : Promise<void> | void {}
 
     /**
      * Validates a player attempt to join the room.
@@ -276,7 +298,7 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
      * @param action - The state change that the player is attempting.
      * @returns an error Result if the Action is invalid, and a success result otherwise
      */
-    public abstract validatePlayerAction(player : Player, action : Action<Actions>) : Promise<Result>
+    public abstract validatePlayerAction(player : Player, action : Action<Actions>) : Promise<Result> | Result
    
     /**
      * Called when a valid player action is processed.
@@ -291,19 +313,19 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
      * 
      * @param state - The state after update
      */
-    public onStateUpdate() : void {}
+    public onStateUpdate() : Promise<void> | void {}
 
     /**
-     * Called when the room starts.
+     * Called when the room starts. 
      */
-    public onRoomStart() : void {}
+    public onRoomStart() : Promise<void> | void {}
 
     /**
      * Called when a player reconnects.
      * 
      * @param player - The player that is reconnecting.
      */
-    public onPlayerReconnect(player : Player) : void {}
+    public onPlayerReconnect(player : Player) : Promise<void> | void {}
 
 
     // ----- PUBLIC API -----
