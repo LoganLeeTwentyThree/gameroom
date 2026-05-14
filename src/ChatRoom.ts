@@ -7,7 +7,6 @@ type Chat = {
 }
 
 type ChatState = {
-    connected: Array<string>,
     chats: Array<Chat>
 }
 
@@ -19,7 +18,6 @@ export class ChatRoom<Env> extends GameRoom<ChatState, ChatActions, {}, Env>
 {
     getInitialState(): ChatState {
         return {
-            connected: [],
             chats: []
         }
     }
@@ -39,7 +37,7 @@ export class ChatRoom<Env> extends GameRoom<ChatState, ChatActions, {}, Env>
 
     public onValidPlayerAction(player: Player, action: Action<ChatActions>): void {
     if (action.type == "CHAT") {
-            this.currentGameState.pushToField("chats", {
+            this.state.pushToField("chats", {
                 body: action.payload.message,
                 sender: player.id
             })

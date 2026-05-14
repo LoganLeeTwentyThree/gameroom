@@ -6,7 +6,7 @@ import { GameState, Action, ActionMap, Player, Result, JSONValue, BaseState } fr
  */
 export abstract class GameRoom<State extends Record<string, JSONValue>, Actions extends ActionMap, Config, Env> extends DurableObject<Env> {
     private baseState : BaseState
-    protected readonly currentGameState : GameState<State>
+    protected readonly state : GameState<State>
     protected config : Config
 
     //----- DURABLE OBJECT LIFECYCLE -----
@@ -32,10 +32,10 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
 
         if(oldState && this.ctx.getWebSockets().length > 0)
         {
-            this.currentGameState = new GameState<State>((deltas) => this._OnStateUpdate(deltas), oldState)
+            this.state = new GameState<State>((deltas) => this._OnStateUpdate(deltas), oldState)
         }else 
         {
-            this.currentGameState = new GameState<State>((deltas) => this._OnStateUpdate(deltas), this.getInitialState())
+            this.state = new GameState<State>((deltas) => this._OnStateUpdate(deltas), this.getInitialState())
             this.onRoomStart()
         }
 
@@ -65,7 +65,7 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
             if(url.searchParams.get("spectator"))
             {
                 server.serializeAttachment({
-                    name: url.searchParams.get("playerName") ?? "Player" + this.getActivePlayers().length,
+                    name: url.searchParams.get("playerName") ?? "Spectator",
                     id: crypto.randomUUID(),
                     spectator: true
                 })
@@ -256,7 +256,7 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
         if(!deltas)
         {
             //dont send the secrets!
-            const { secrets: secrets, ...safeState } = this.currentGameState.getStateValues()
+            const { secrets: secrets, ...safeState } = this.state.getValues()
             for(const ws of this.ctx.getWebSockets())
             {        
                 this.safeWsSend(ws, { state: safeState, players: this.baseState.activePlayers })
@@ -272,7 +272,7 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
         }
         
 
-        this.ctx.storage.kv.put("gamestate", this.currentGameState.getStateValues())
+        this.ctx.storage.kv.put("gamestate", this.state.getValues())
         this.ctx.storage.kv.put("basestate", this.baseState)
 
         this.onStateUpdate()

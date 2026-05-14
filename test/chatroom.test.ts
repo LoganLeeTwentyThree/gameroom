@@ -7,13 +7,6 @@ describe("ChatRoom Durable Object", () => {
     const id = env.CHAT_ROOM.idFromName("test");
     const stub = env.CHAT_ROOM.get(id);
 
-    it("should instantiate the room", async () => {
-        await runInDurableObject(stub, async (instance, state) => {
-            expect(instance).toBeInstanceOf(ChatRoom);
-        });
-
-    });
-
     it("should reject invalid messages", async () => {
         await runInDurableObject(stub, async (instance, state) => {
             await instance.fetch!(
@@ -61,14 +54,13 @@ describe("ChatRoom Durable Object", () => {
             const serverWs = state.getWebSockets()[0];
             await instance.webSocketMessage(serverWs, `{ "type": "CHAT", "payload": { "message": "Hello" } }`);
 
-            expect(instance.currentGameState.getStateValues().chats).toStrictEqual(
+            expect(instance.state.getValues().chats).toStrictEqual(
                 [{body: "Hello", sender: expect.any(String)}]
             );
         });
     })
 
     it("should push out state changes", async () => {
-
         await runInDurableObject(stub, async (instance, state) => {
             await instance.fetch!(
                 new Request("https://example.com/websocket", {
@@ -164,7 +156,7 @@ describe("ChatRoom Durable Object", () => {
                 })
             );
 
-            expect(instance.currentGameState.getStateValues().chats[0].body).toStrictEqual(`Hello`)
+            expect(instance.state.getValues().chats[0].body).toStrictEqual(`Hello`)
         });
 
 

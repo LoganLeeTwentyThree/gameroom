@@ -52,7 +52,7 @@ export class GameState<State extends Record<string, JSONValue>>
         return this.values[key] as (State)[K]
     }
 
-    public getStateValues() : State
+    public getValues() : State
     {
         return this.values
     }
