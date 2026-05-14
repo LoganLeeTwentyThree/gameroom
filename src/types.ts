@@ -1,5 +1,5 @@
 export type BaseConfig = {
-    //may want something here in the future...
+    
 }
 
 type JSONPrimitive = string | number | boolean | null;
@@ -13,8 +13,8 @@ export type JSONValue =
 export class GameState<State extends Record<string, JSONValue>>
 {
     private values: State
-    private onStateChanged: () => void
-    constructor(onStateChanged: () => void, existingState: State)
+    private onStateChanged: (deltas: Partial<State>) => void
+    constructor(onStateChanged: (deltas: Partial<State>) => void, existingState: State)
     {
         this.values = existingState
         this.onStateChanged = onStateChanged
@@ -23,7 +23,7 @@ export class GameState<State extends Record<string, JSONValue>>
     public UpdateState(newState : Partial<State>) : void
     {
         Object.assign(this.values, newState)
-        this.onStateChanged()
+        this.onStateChanged(newState)
     }
 
     public incrementField(key: keyof (State), by: number = 1) : void
@@ -94,7 +94,7 @@ export type Result =
 export type Player = {
     name: string,
     id: string,
-    ip: string,
+    spectator: boolean,
 }
 
 export type BaseState = {

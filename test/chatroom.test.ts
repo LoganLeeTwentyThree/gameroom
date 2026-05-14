@@ -15,22 +15,21 @@ describe("ChatRoom Durable Object", () => {
     });
 
     it("should reject invalid messages", async () => {
-
         await runInDurableObject(stub, async (instance, state) => {
-            const response = await instance.fetch!(
+            await instance.fetch!(
                 new Request("https://example.com/websocket", {
                     headers: { "Upgrade": "websocket" },
                 })
             );
 
             const serverWs = state.getWebSockets()[0];
-
             const sent: unknown[] = [];
+
             vi.spyOn(serverWs, "send").mockImplementation((data) => {
                 sent.push(JSON.parse(data as string));
             });
 
-            await instance.webSocketMessage(serverWs, "{ test: [] }");
+            await instance.webSocketMessage(serverWs, `{ test: [] }`);
 
             expect(sent[0]).toStrictEqual({
                 message: { error: "Invalid message format" },
@@ -71,7 +70,7 @@ describe("ChatRoom Durable Object", () => {
     it("should push out state changes", async () => {
 
         await runInDurableObject(stub, async (instance, state) => {
-            const response = await instance.fetch!(
+            await instance.fetch!(
                 new Request("https://example.com/websocket", {
                     headers: { "Upgrade": "websocket" },
                 })
@@ -87,6 +86,69 @@ describe("ChatRoom Durable Object", () => {
             await instance.webSocketMessage(serverWs, `{ "type": "CHAT", "payload": { "message": "Hello" } }`);
 
             expect(sent[0].message.state.chats[0].body).toStrictEqual(`Hello`)
+        });
+    })
+
+    it("should let spectators join and recieve messages", async () => {
+        await runInDurableObject(stub, async (instance, state) => {
+            const response = await instance.fetch!(
+                new Request("https://example.com/websocket?spectator=true", {
+                    headers: { "Upgrade": "websocket" },
+                })
+            );
+
+            expect(response.status).toBe(101)
+            expect(instance.getActivePlayers().length).toBe(state.getWebSockets().length - 1)
+        
+            const spectatorWs = state.getWebSockets().find(ws => 
+                ws.deserializeAttachment().spectator === true
+            )!;
+
+            expect(spectatorWs).toBeDefined()
+
+            const sent: unknown[] = [];
+            vi.spyOn(spectatorWs, "send").mockImplementation((data) => {
+                sent.push(JSON.parse(data as string));
+            });
+
+            const serverWs = state.getWebSockets().find(ws => 
+                ws.deserializeAttachment().spectator === false
+            )!;
+
+            await instance.webSocketMessage(serverWs, `{ "type": "CHAT", "payload": { "message": "Hello" } }`);
+        
+            expect(sent[0]).toStrictEqual({
+                message: { state: expect.any(Object), players: expect.any(Object) },
+                playerId: expect.any(String),
+            })
+        });
+    })
+
+    it("should prevent spectators from chatting", async () => {
+        await runInDurableObject(stub, async (instance, state) => {
+        
+            const spectatorWs = state.getWebSockets().find(ws => 
+                ws.deserializeAttachment().spectator === true
+            )!;
+
+            expect(spectatorWs).toBeDefined()
+
+            const sent: unknown[] = [];
+            vi.spyOn(spectatorWs, "send").mockImplementation((data) => {
+                sent.push(JSON.parse(data as string));
+            });
+
+
+            const serverWs = state.getWebSockets().find(ws => 
+                ws.deserializeAttachment().spectator === false
+            )!;
+
+            await instance.webSocketMessage(spectatorWs, `{ "type": "CHAT", "payload": { "message": "Hello" } }`);
+        
+            expect(sent[0]).toStrictEqual({
+                message: { error: "Spectators can't act." },
+                playerId: expect.any(String),
+            })
         });
     })
 

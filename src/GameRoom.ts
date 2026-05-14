@@ -32,10 +32,10 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
 
         if(oldState && this.ctx.getWebSockets().length > 0)
         {
-            this.currentGameState = new GameState<State>(() => this._OnStateUpdate(), oldState)
+            this.currentGameState = new GameState<State>((deltas) => this._OnStateUpdate(deltas), oldState)
         }else 
         {
-            this.currentGameState = new GameState<State>(() => this._OnStateUpdate(), this.getInitialState())
+            this.currentGameState = new GameState<State>((deltas) => this._OnStateUpdate(deltas), this.getInitialState())
             this.onRoomStart()
         }
 
@@ -56,6 +56,49 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
                 return new Response("Expected websocket", { status: 406 })
             }
 
+            // Creates two ends of a WebSocket connection.
+            const webSocketPair = new WebSocketPair();
+            const [client, server] = Object.values(webSocketPair) as [WebSocket, WebSocket]
+
+            
+
+            if(url.searchParams.get("spectator"))
+            {
+                server.serializeAttachment({
+                    name: url.searchParams.get("playerName") ?? "Player" + this.getActivePlayers().length,
+                    id: crypto.randomUUID(),
+                    spectator: true
+                })
+
+                this.ctx.acceptWebSocket(server);
+                    return new Response(null, {
+                    status: 101,
+                    webSocket: client,
+                });
+            }
+
+            //check if this is a reconnect or a new player
+            const existingId = url.searchParams.get("playerId")
+            const existingPlayer = existingId 
+                ? this.baseState.playerMap[existingId]
+                : undefined
+
+            const player: Player = existingPlayer ?? {
+                name: url.searchParams.get("playerName") ?? "Player" + this.getActivePlayers().length,
+                id: crypto.randomUUID(),
+                spectator: false
+            }
+
+            server.serializeAttachment(player)
+
+            this.ctx.acceptWebSocket(server);
+
+            if(existingPlayer) {
+                this.onPlayerReconnect(player)
+            } else {
+                this._OnPlayerJoin(player)
+            }
+
             const attempt = this.validatePlayerTryJoin()
 
             if(!attempt.success)
@@ -63,43 +106,16 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
                 return new Response(attempt.reason, { status: 406 })
             }
 
-            break;
+            return new Response(null, {
+                status: 101,
+                webSocket: client,
+            });
         case "/":
             break;
         default:
             return new Response("Not found", { status: 404 });
         }
-
-        // Creates two ends of a WebSocket connection.
-        const webSocketPair = new WebSocketPair();
-        const [client, server] = Object.values(webSocketPair) as [WebSocket, WebSocket]
-
-        //check if this is a reconnect or a new player
-        const existingId = url.searchParams.get("playerId")
-        const existingPlayer = existingId 
-            ? this.baseState.playerMap[existingId]
-            : undefined
-
-        const player: Player = existingPlayer ?? {
-            name: url.searchParams.get("playerName") ?? "Player",
-            id: crypto.randomUUID(),
-            ip: request.headers.get("CF-Connecting-IP") ?? "0.0.0.0" // for use with rate limiting
-        }
-
-        server.serializeAttachment(player)
-
-        this.ctx.acceptWebSocket(server);
-
-        if(existingPlayer) {
-            this.onPlayerReconnect(player)
-        } else {
-            this._OnPlayerJoin(player)
-        }
-
-        return new Response(null, {
-            status: 101,
-            webSocket: client,
-        });
+        return new Response("Not found", { status: 404 });
     }
 
     /**
@@ -122,6 +138,13 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
         
              
         const player : Player = ws.deserializeAttachment()
+
+        if(player.spectator)
+        {
+            this.safeWsSend(ws, { error: "Spectators can't act." })
+            return
+        }
+
         const result : Result = await this.validatePlayerAction(player, action)
 
         if(result.success)
@@ -228,14 +251,26 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
         this.onPlayerLeave(player)
     }
 
-    private _OnStateUpdate() : void
+    private _OnStateUpdate(deltas? : Partial<State>) : void
     {
-        for(const ws of this.ctx.getWebSockets())
+        if(!deltas)
         {
             //dont send the secrets!
             const { secrets: secrets, ...safeState } = this.currentGameState.getStateValues()
-            this.safeWsSend(ws, { state: safeState })
+            for(const ws of this.ctx.getWebSockets())
+            {        
+                this.safeWsSend(ws, { state: safeState, players: this.baseState.activePlayers })
+            }
+        }else
+        {
+            const { secrets: secrets, ...safeState } = deltas
+            for(const ws of this.ctx.getWebSockets())
+            {
+                this.safeWsSend(ws, { state: safeState as JSONValue, players: this.baseState.activePlayers })
+            }
+            
         }
+        
 
         this.ctx.storage.kv.put("gamestate", this.currentGameState.getStateValues())
         this.ctx.storage.kv.put("basestate", this.baseState)
@@ -250,10 +285,9 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
      */
     public closeRoom() : void
     {
-        console.log("Closing room")
         for( const ws of this.ctx.getWebSockets())
         {
-            this.webSocketClose(ws, 1001, "Server is shutting down", false)
+            ws.close(1001, "Server is shutting down")
         }
 
         this.ctx.storage.deleteAll()

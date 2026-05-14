@@ -148,4 +148,15 @@ describe("MatchMaker Durable Object", () => {
         })
     })
 
+    it("should persist state through hibernation", async () => {
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+        stub.setMatchSize(3)
+        await sleep(10000) // 10 secs -> hibernation started
+
+        await runInDurableObject(stub, async (instance, state) => {
+            expect(instance.matchSize).toBe(3)
+        });
+
+
+    }, 11_000)
 })
