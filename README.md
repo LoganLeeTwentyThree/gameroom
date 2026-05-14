@@ -94,7 +94,7 @@ A `GameRoom` is a durable object class that handles the back end logic of your g
 
 Players communicate with the GameRoom using an `Action`. Each action has a type (a string) and a payload, which is an object that represents the game action that is to be performed, should the server accept it. 
 
-The following is a diagram that shows the basic setup of a Gameroom. Abstract methods that must be implemented in your class are marked colored light grey.
+The following is a diagram that shows the basic setup of a Gameroom. Abstract methods that must be implemented in your class are colored light grey.
 
 ![GameRoom abstract methods](/imgs/graph.png)
 
