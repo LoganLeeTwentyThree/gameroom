@@ -1,5 +1,6 @@
 # Gameroom
 Gameroom is a typescript package that makes building games with Cloudflare's Durable Objects easier. With Gameroom, you don't have to worry about the Durable Object lifecycle, and you can focus more on building your game.
+
 ## Installation
 Run `npm install @loganlee23/gameroom`
 
@@ -92,6 +93,11 @@ Put any static files in the `public` directory of your project and that content 
 A `GameRoom` is a durable object class that handles the back end logic of your game. It is the "server" that players communicate with to sync state information and make moves. Each lobby has its own unique gameroom. Your game's back end simply extends GameRoom to get lots of useful functionality.
 
 Players communicate with the GameRoom using an `Action`. Each action has a type (a string) and a payload, which is an object that represents the game action that is to be performed, should the server accept it. 
+
+The following is a diagram that shows the basic setup of a Gameroom. Abstract methods that must be implemented in your class are marked colored light grey.
+
+![GameRoom abstract methods](/imgs/graph.png)
+
 ```typescript
 class MyGame<Env> extends GameRoom<MyState, MyActions, MyConfig, Env>
 {

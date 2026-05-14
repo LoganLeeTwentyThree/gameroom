@@ -19,13 +19,11 @@ abstract class GameRoom<
 
 ### Abstract Methods
 
-These must be implemented by every subclass.
-
 #### `getInitialState(): State`
 
-Returns the starting state object. Called **once** on first construction. Never called again after hibernation recovery — state is restored from Durable Object storage instead.
+Returns the starting state. Called **once** on first construction. Never called after hibernation recovery — state is restored from storage.
 
-Do not make this `async`. It is called synchronously in the constructor.
+Do not make this `async`. Called synchronously in the constructor.
 
 ---
 
@@ -33,7 +31,7 @@ Do not make this `async`. It is called synchronously in the constructor.
 
 Returns the room config. Called on **every** construction, including after hibernation. Keep it static — do not derive config from async sources.
 
-Do not make this `async`. It is called synchronously in the constructor.
+Do not make this `async`. Called synchronously in the constructor.
 
 ---
 
@@ -41,19 +39,11 @@ Do not make this `async`. It is called synchronously in the constructor.
 
 Called when an incoming WebSocket connection arrives at `/websocket`, before the connection is accepted. Return `{ success: false, reason: string }` to reject with a 406 response.
 
-```typescript
-public validatePlayerTryJoin(): Result
-```
-
 ---
 
-#### `validatePlayerAction(player: Player, action: Action<Actions>): Promise<Result>`
+#### `validatePlayerAction(player: Player, action: Action<Actions>): Promise<Result> | Result`
 
-Called for every message received from a connected client. Return `{ success: false, reason: string }` to reject the action — the error is sent back to the client and `onValidPlayerAction` is not called.
-
-```typescript
-public async validatePlayerAction(player: Player, action: Action<Actions>): Promise<Result>
-```
+Called for every message from a connected client. Return `{ success: false, reason: string }` to reject — the error is sent back to the client and `onValidPlayerAction` is not called.
 
 ---
 
@@ -61,25 +51,21 @@ public async validatePlayerAction(player: Player, action: Action<Actions>): Prom
 
 Called after `validatePlayerAction` returns `{ success: true }`. Apply the action to state here.
 
-```typescript
-public onValidPlayerAction(player: Player, action: Action<Actions>): void
-```
-
 ---
 
 ### Overridable Hooks
 
-These have empty default implementations. Override as needed.
+All have empty default implementations.
 
 #### `onRoomStart(): void`
 
-Fires on first construction when no prior persisted state exists. Use it for one-time server-side setup.
+Fires on first construction when no prior persisted state exists.
 
 ---
 
 #### `onPlayerJoin(player: Player): void`
 
-Fires after a new player is registered and the updated state has been broadcast to all clients.
+Fires after a new player is registered and state has been broadcast to all clients.
 
 ---
 
@@ -91,13 +77,19 @@ Fires after a player disconnects and is removed from active players. **Not calle
 
 #### `onPlayerReconnect(player: Player): void`
 
-Fires when a WebSocket arrives with a `?playerId=<uuid>` query param matching an existing player record. The existing `Player` object is reused. `onPlayerJoin` does not fire.
+Fires when a WebSocket arrives with a `?playerId=<uuid>` query param matching an existing player. The existing `Player` object is reused. `onPlayerJoin` does not fire.
+
+---
+
+#### `onPlayerError(player: Player, error: unknown): void`
+
+Fires when a WebSocket error occurs for a connected player.
 
 ---
 
 #### `onStateUpdate(): void`
 
-Fires after every state broadcast. Override for post-broadcast side effects.
+Fires after every state broadcast.
 
 ---
 
@@ -111,19 +103,15 @@ Closes all WebSocket connections, deletes all Durable Object storage, and aborts
 
 #### `sendMessageToPlayer(player: Player, message: JSONValue): Result`
 
-Sends a message to a single player. The message is wrapped in the standard `{ message, playerId }` envelope.
+Sends a message to a single player. Wrapped in the standard `{ message, playerId }` envelope.
 
 Returns `{ success: false, reason }` if the player's WebSocket is not found or not open.
-
-```typescript
-public sendMessageToPlayer(player: Player, message: JSONValue): Result
-```
 
 ---
 
 #### `getActivePlayers(): Player[]`
 
-Returns all players currently connected to the room.
+Returns all players currently connected (excludes spectators).
 
 ---
 
@@ -135,13 +123,13 @@ Returns all players that have ever connected during this room's current lifetime
 
 #### `getPlayer(id: string): Player | undefined`
 
-Looks up a player by ID from the lifetime player map. Returns `undefined` if not found.
+Looks up a player by ID from the lifetime player map.
 
 ---
 
 ### Protected Properties
 
-#### `currentGameState: GameState<State>`
+#### `state: GameState<State>`
 
 The room's state instance. Use its methods to read and mutate state. Do not replace this reference.
 
@@ -160,10 +148,11 @@ Upgrade: websocket
 
 | Query param | Required | Description |
 |---|---|---|
-| `playerName` | No | Display name for a new player. Defaults to `"Player"`. |
-| `playerId` | No | UUID of an existing player. Triggers reconnect flow instead of join. |
+| `playerName` | No | Display name for a new player. Defaults to `"Player<n>"`. |
+| `playerId` | No | UUID of an existing player. Triggers reconnect flow. |
+| `spectator` | No | Any truthy value. Connects as a spectator — receives broadcasts, cannot act. |
 
-A `GET /` request is a no-op passthrough in the base class. All other paths return 404.
+`GET /` is a no-op passthrough. All other paths return 404.
 
 ---
 
@@ -171,23 +160,21 @@ A `GET /` request is a no-op passthrough in the base class. All other paths retu
 
 **Server → Client**
 
-All outgoing messages are JSON-encoded and wrapped:
+All outgoing messages are JSON and wrapped:
 
 ```json
 { "message": <payload>, "playerId": "<uuid>" }
 ```
 
-The `secrets` key is stripped from state before broadcast but retained in storage.
+State broadcasts send `{ state, players }` as the `message`. The `secrets` key is stripped from state before broadcast but retained in storage.
 
 **Client → Server**
-
-Actions must be JSON-encoded:
 
 ```json
 { "type": "ACTION_TYPE", "payload": <JSONValue> }
 ```
 
-Actions with a `never` payload omit the `payload` key entirely.
+Actions with a `never` payload omit `payload`.
 
 ---
 
@@ -195,9 +182,7 @@ Actions with a `never` payload omit the `payload` key entirely.
 
 ## `GameState<State>`
 
-**`src/types.ts`** — not exported from `index.ts`. Accessed only via `this.currentGameState` inside a `GameRoom` subclass.
-
-Every mutating method triggers a state broadcast and persist. Do not chain multiple mutating calls when a single `UpdateState` with a merged partial will do.
+Accessed only via `this.state` inside a `GameRoom` subclass. Every mutating method triggers a full state broadcast and persist.
 
 ---
 
@@ -205,17 +190,17 @@ Every mutating method triggers a state broadcast and persist. Do not chain multi
 
 #### `UpdateState(newState: Partial<State>): void`
 
-Merges `newState` into current state, broadcasts to all clients, and persists to Durable Object storage.
+Merges `newState` into current state, broadcasts to all clients, and persists to storage.
 
 ---
 
 #### `getField<K extends keyof State>(key: K): State[K]`
 
-Returns the current value of a single state field.
+Returns the current value of a single field.
 
 ---
 
-#### `getStateValues(): State`
+#### `getValues(): State`
 
 Returns the full current state object.
 
@@ -243,7 +228,7 @@ Appends `item` to an array field. Throws if the field is not an array. Calls `Up
 
 ## `MatchMaker<Env>`
 
-**`src/MatchMaker.ts`** — a single shared Durable Object that queues players and groups them into lobbies.
+**`src/MatchMaker.ts`** — single shared Durable Object that queues players and groups them into lobbies.
 
 ```typescript
 class MatchMaker<Env> extends DurableObject<Env>
@@ -260,7 +245,7 @@ const stub = env.MATCH_MAKER.get(id)
 
 ### Behavior
 
-Accepts WebSocket upgrade requests. Each connection is tagged with a queue key from the `?queue=` query param (defaults to `"0"`). An alarm fires 100ms after each new connection.
+Accepts WebSocket upgrade requests. Each connection is tagged with a queue key from `?queue=` (defaults to `"0"`). An alarm fires 100ms after each new connection.
 
 When the alarm fires, for each queue with at least `matchSize` waiting players, it groups them, sends each a match message, and closes their connections:
 
@@ -276,7 +261,7 @@ Players who disconnect before being matched are silently skipped.
 
 #### `matchSize: number`
 
-Number of players required to form a match. Default `2`.
+Number of players required to form a match. Default `2`. Persisted across hibernation via `ctx.storage.kv`.
 
 ---
 
@@ -284,7 +269,7 @@ Number of players required to form a match. Default `2`.
 
 #### `setMatchSize(size: number): Promise<void>`
 
-Updates `matchSize`. Call this on the stub before players start queuing.
+Updates `matchSize` and persists it. Call this on the stub before players start queuing.
 
 ---
 
@@ -305,17 +290,16 @@ Upgrade: websocket
 
 ## `ChatRoom<Env>`
 
-**`src/ChatRoom.ts`** — a minimal concrete `GameRoom` implementation. Use it as a reference when building your own room.
+**`src/ChatRoom.ts`** — minimal concrete `GameRoom` implementation. Use as a reference.
 
 ```typescript
 class ChatRoom<Env> extends GameRoom<ChatState, ChatActions, {}, Env>
 ```
 
-### State shape
+### State
 
 ```typescript
 type ChatState = {
-  connected: Array<string>
   chats: Array<{ body: string; sender: string }>
 }
 ```
@@ -328,7 +312,7 @@ type ChatActions = {
 }
 ```
 
-`CHAT` appends `{ body: action.payload.message, sender: player.id }` to the `chats` array. All connections are accepted. All actions are accepted.
+`CHAT` appends `{ body: action.payload.message, sender: player.id }` to `chats`. All connections accepted. All actions accepted.
 
 ---
 
@@ -336,17 +320,13 @@ type ChatActions = {
 
 ## Types
 
-**`src/types.ts`**
-
----
-
 ### `Player`
 
 ```typescript
 type Player = {
   name: string
-  id: string   // crypto.randomUUID()
-  ip: string   // CF-Connecting-IP header
+  id: string        // crypto.randomUUID()
+  spectator: boolean
 }
 ```
 
@@ -408,7 +388,7 @@ All state fields must be assignable to `JSONValue`.
 
 ### `BaseState`
 
-Internal type managed by `GameRoom`. Not exported. Do not mutate directly.
+Internal. Not exported. Do not mutate directly.
 
 ```typescript
 type BaseState = {
