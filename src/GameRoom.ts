@@ -296,7 +296,7 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
     }
 
     /**
-     * Called when a player joins the room.
+     * Called when a player's connection errors.
      * 
      * @param player - The player that errored.
      * @param error - The error object provided by the DO runtime
