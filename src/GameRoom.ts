@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers"
 import { GameState, Action, ActionMap, Player, Result, JSONValue, BaseState } from "./types.js"
+import { GameRoomPlugin } from "./Plugins.js"
 
 /**
  * A lobby that tracks state and invokes hooks for your game.
@@ -8,6 +9,7 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
     private baseState : BaseState
     protected readonly state : GameState<State>
     protected config : Config
+    protected readonly plugins : GameRoomPlugin[]
 
     //----- DURABLE OBJECT LIFECYCLE -----
 
@@ -16,6 +18,12 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
 
         const oldState : State | null | undefined = this.ctx.storage.kv.get("gamestate")
         const oldBaseState : BaseState | null | undefined = this.ctx.storage.kv.get("basestate")
+
+        // set the config according to user defined config 
+        this.config = this.getConfig()
+
+        // attach plugins
+        this.plugins = this.getPlugins()
 
         //if we are being reconstructed after hibernation, we restore the old state from pre hibernation
         if(oldBaseState)
@@ -39,13 +47,23 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
             this.onRoomStart()
         }
 
-        // set the config according to user defined config 
-        this.config = this.getConfig()
+        const saved : Record<string, JSONValue> | undefined = this.ctx.storage.kv.get("plugins")
+        if(saved)
+        {
+            for (const plugin of this.plugins) {
+                const data = saved[plugin.constructor.name]
+                if (data) plugin.hydrate(data as Record<string, JSONValue>)
+            }
+        }
+        
+
+        
     }
 
     //User defines their state and config defaults in their child class
     abstract getInitialState(): State
     abstract getConfig() : Config
+    getPlugins() : GameRoomPlugin[] {return []}
 
     async fetch(request: Request): Promise<Response> {
         const url = new URL(request.url)
@@ -94,6 +112,7 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
             this.ctx.acceptWebSocket(server);
 
             if(existingPlayer) {
+                this.plugins.forEach((plugin) => plugin.onPlayerJoin(player))
                 this.onPlayerReconnect(player)
             } else {
                 this._OnPlayerJoin(player)
@@ -230,6 +249,8 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
             [player.id]: player
         }
 
+        this.plugins.forEach((plugin) => plugin.onPlayerJoin(player))
+
         this._OnStateUpdate()
         this.onPlayerJoin(player)
     }
@@ -247,12 +268,14 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
             return
         }
 
+        this.plugins.forEach((plugin) => plugin.onPlayerLeave(player))
         this._OnStateUpdate()
         this.onPlayerLeave(player)
     }
 
     private _OnStateUpdate(deltas? : Partial<State>) : void
     {
+        this.plugins.forEach((plugin) => plugin.onStateUpdate())
         if(!deltas)
         {
             //dont send the secrets!
@@ -270,11 +293,16 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
             }
             
         }
-        
 
+        const pluginData: Record<string, JSONValue> = {}
+        for (const plugin of this.plugins) {
+            pluginData[plugin.constructor.name] = plugin.serialize()
+        }
+        this.ctx.storage.kv.put("plugins", pluginData)
         this.ctx.storage.kv.put("gamestate", this.state.getValues())
         this.ctx.storage.kv.put("basestate", this.baseState)
 
+        
         this.onStateUpdate()
     }
 

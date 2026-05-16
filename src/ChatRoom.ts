@@ -1,4 +1,5 @@
 import { GameRoom } from "./GameRoom.js";
+import { GameRoomPlugin } from "./Plugins.js";
 import { Result, Player, Action } from "./types.js";
 
 type Chat = {
