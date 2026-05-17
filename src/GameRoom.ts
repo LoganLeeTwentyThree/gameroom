@@ -9,7 +9,7 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
     private baseState : BaseState
     protected readonly state : GameState<State>
     protected config : Config
-    protected readonly plugins : GameRoomPlugin[]
+    protected readonly plugins : Record<string, GameRoomPlugin>
 
     //----- DURABLE OBJECT LIFECYCLE -----
 
@@ -47,11 +47,10 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
             this.onRoomStart()
         }
 
-        const saved : Record<string, JSONValue> | undefined = this.ctx.storage.kv.get("plugins")
-        if(saved)
-        {
-            for (const plugin of this.plugins) {
-                const data = saved[plugin.constructor.name]
+        const saved: Record<string, JSONValue> | undefined = this.ctx.storage.kv.get("plugins")
+        if (saved) {
+            for (const [key, plugin] of Object.entries(this.plugins)) {
+                const data = saved[key]
                 if (data) plugin.hydrate(data as Record<string, JSONValue>)
             }
         }
@@ -63,7 +62,7 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
     //User defines their state and config defaults in their child class
     abstract getInitialState(): State
     abstract getConfig() : Config
-    getPlugins() : GameRoomPlugin[] {return []}
+    getPlugins() : Record<string, GameRoomPlugin> {return {}}
 
     async fetch(request: Request): Promise<Response> {
         const url = new URL(request.url)
@@ -112,7 +111,7 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
             this.ctx.acceptWebSocket(server);
 
             if(existingPlayer) {
-                this.plugins.forEach((plugin) => plugin.onPlayerJoin(player))
+                Object.values(this.plugins).forEach(plugin => plugin.onPlayerReconnect(player))
                 this.onPlayerReconnect(player)
             } else {
                 this._OnPlayerJoin(player)
@@ -249,8 +248,7 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
             [player.id]: player
         }
 
-        this.plugins.forEach((plugin) => plugin.onPlayerJoin(player))
-
+        Object.values(this.plugins).forEach(plugin => plugin.onPlayerJoin(player))
         this._OnStateUpdate()
         this.onPlayerJoin(player)
     }
@@ -268,14 +266,14 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
             return
         }
 
-        this.plugins.forEach((plugin) => plugin.onPlayerLeave(player))
+        Object.values(this.plugins).forEach(plugin => plugin.onPlayerLeave(player))
         this._OnStateUpdate()
         this.onPlayerLeave(player)
     }
 
     private _OnStateUpdate(deltas? : Partial<State>) : void
     {
-        this.plugins.forEach((plugin) => plugin.onStateUpdate())
+        Object.values(this.plugins).forEach(plugin => plugin.onStateUpdate())
         if(!deltas)
         {
             //dont send the secrets!
@@ -295,8 +293,8 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
         }
 
         const pluginData: Record<string, JSONValue> = {}
-        for (const plugin of this.plugins) {
-            pluginData[plugin.constructor.name] = plugin.serialize()
+        for (const [key, plugin] of Object.entries(this.plugins)) {
+            pluginData[key] = plugin.serialize()
         }
         this.ctx.storage.kv.put("plugins", pluginData)
         this.ctx.storage.kv.put("gamestate", this.state.getValues())
