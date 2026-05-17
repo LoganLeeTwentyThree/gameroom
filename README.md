@@ -36,22 +36,27 @@ class MyGame<Env> extends GameRoom<MyState, MyActions, {}, Env>
         super(ctx, env)
     }
 
+    //initial state
+    getInitialState()
+    {
+        return { count: 0 }
+    }
+
     //Anyone can join at any time 
     public validatePlayerTryJoin() : Result 
     { return {sucess: true} }
 
     //All actions are legal
-    public validatePlayerAction(player : Player, action : Action<FullState<State>>) : Result 
+    public validatePlayerAction(player : Player, action : Action<MyActions>) : Result 
     { return {success: true} }
 
     //This game just lets players increase a number (is that a game?)
-    public onValidPlayerAction(player : Player, action : Action<FullState<State>>) : void 
+    public onValidPlayerAction(player : Player, action : Action<MyActions>) : void 
     {
         if(action.type === "INCREASE")
         {
             this.currentGameState.incrementField("count", action.payload.count )
         }
-        
     }
 }
 ```
@@ -130,14 +135,8 @@ Each `GameRoom` keeps track of its `GameState`, which is an object representing 
 Since game state needs to be serialized, it must be composed only of JSON serializable types. Gamestate's state is changed through setters so that appropriate hooks can be called.
 
 ### Game Config
-In addition to handling GameState, each `GameRoom` also has a customizable configuratuion. By setting the room's config, you can set your player count, lobby privacy, or anything else you might need.
+In addition to handling GameState, each `GameRoom` also has a customizable configuratuion. By setting the room's config, you can set your player count, lobby privacy, or anything else you might need. A config is essentially just a list of constants that your room might need to consult.
 ```typescript
-type BaseConfig = 
-{
-    maxPlayers: number,
-    isPrivate: boolean
-}
-
 type MyGameConfig =
 {
     maxItemCount: number, 
@@ -147,7 +146,7 @@ type MyGameConfig =
 ```
 
 ### Utilities
-Game room comes bundled with a MatchMaker durable object that you can use if you want. You'll have to create bindings for it in your wrangler.toml if you plan on using it. There may be more utilities in the future.
+Game room comes bundled with some useful durable objects that you can use if you want. You'll have to create bindings for them in your wrangler.toml if you plan on using them.
 #### MatchMaker
 A `MatchMaker` is a durable object class that handles matchmaking. It can assign players into queues and match them together into GameRooms. There should usually only be one matchmaker, but multiple can be used too.
 
