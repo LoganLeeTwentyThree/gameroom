@@ -23,10 +23,6 @@ export class ChatRoom<Env> extends GameRoom<ChatState, ChatActions, {}, Env>
         }
     }
 
-    getConfig(): {} {
-        return {}
-    }
-
     public validatePlayerTryJoin(): Result {
         return {success: true}
     }

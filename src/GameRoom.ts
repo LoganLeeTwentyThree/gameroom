@@ -61,7 +61,7 @@ export abstract class GameRoom<State extends Record<string, JSONValue>, Actions 
 
     //User defines their state and config defaults in their child class
     abstract getInitialState(): State
-    abstract getConfig() : Config
+    getConfig() : Config { return {} as Config }
     getPlugins() : Record<string, GameRoomPlugin> {return {}}
 
     async fetch(request: Request): Promise<Response> {

@@ -27,12 +27,11 @@ src/
 
 ### GameRoom
 
-Consumers subclass `GameRoom<State, Actions, Config, Env>` and implement five abstract methods:
+Consumers subclass `GameRoom<State, Actions, Config, Env>` and implement four abstract methods:
 
 | Method | Purpose |
 |---|---|
 | `getInitialState()` | Returns the starting state — called once on first construction only, never after hibernation recovery |
-| `getConfig()` | Returns room config — called every construction including after hibernation; keep it static |
 | `validatePlayerTryJoin()` | Gate incoming WebSocket connections; return `{ success: false, reason }` to reject |
 | `validatePlayerAction(player, action)` | Validate each incoming action before it is applied; `async` |
 | `onValidPlayerAction(player, action)` | Apply the validated action to state |
